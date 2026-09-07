@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>ニンニクマンチャリ走(開発中)</title>
+<style>
+  :root{ color-scheme: dark; }
+  html,body{ margin:0; padding:0; background:#1b2a3a; height:100%; overflow:hidden; }
+  body{ display:flex; align-items:center; justify-content:center; font-family:'Yu Gothic',Meiryo,sans-serif; }
+  #wrap{ position:relative; width:960px; height:540px; transform-origin: center center; }
+  canvas{ display:block; width:960px; height:540px; background:#8fd0f2; border-radius:10px; box-shadow:0 8px 30px rgba(0,0,0,.5); }
+  #hud{ position:absolute; top:10px; left:10px; right:10px; display:flex; justify-content:space-between; pointer-events:none; color:#fff; text-shadow:0 1px 3px rgba(0,0,0,.6); font-size:15px; font-weight:bold; }
+  #hud .box{ background:rgba(0,0,0,.35); padding:6px 12px; border-radius:8px; }
+  #bubble{ position:absolute; top:10px; left:50%; transform:translateX(-50%); background:#fff; border:2px solid #C8481A; border-radius:14px; padding:6px 14px; font-size:13px; font-weight:bold; color:#4a2c0f; white-space:nowrap; }
+  .overlay{ position:absolute; inset:0; background:rgba(10,20,30,.72); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; color:#fff; text-align:center; }
+  .overlay.hidden{ display:none; }
+  .overlay h1{ margin:0; font-size:34px; color:#F3980D; text-shadow:0 2px 4px rgba(0,0,0,.5); }
+  .overlay p{ margin:0; font-size:16px; }
+  .btn{ background:#F3980D; color:#3a1f00; border:none; border-radius:10px; padding:12px 30px; font-size:17px; font-weight:bold; cursor:pointer; box-shadow:0 4px 0 #a5650a; }
+  .btn:active{ transform:translateY(3px); box-shadow:0 1px 0 #a5650a; }
+  #progressWrap{ position:absolute; bottom:10px; left:10px; right:10px; height:10px; background:rgba(0,0,0,.35); border-radius:6px; overflow:hidden; }
+  #progressBar{ height:100%; width:0%; background:linear-gradient(90deg,#F3980D,#C8481A); }
+  #crashFlash{ position:absolute; inset:0; background:#ff0000; opacity:0; pointer-events:none; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="game" width="960" height="540"></canvas>
+  <div id="hud">
+    <div class="box">速度: <span id="speedVal">0</span> km/h</div>
+    <div class="box">距離: <span id="distVal">0</span> / <span id="distTotal">0</span> m</div>
+  </div>
+  <div id="bubble">がんばって〜!</div>
+  <div id="progressWrap"><div id="progressBar"></div></div>
+  <div id="crashFlash"></div>
+
+  <div id="startOverlay" class="overlay">
+    <h1>ニンニクマンチャリ走</h1>
+    <p>↓(前傾): 加速 / ↑(後傾): ブレーキ・空中姿勢制御<br>ジャンプ台に乗ると自動でジャンプします。着地角度で失速・爆速が変わる!</p>
+    <button class="btn" id="startBtn">スタート [Enter]</button>
+  </div>
+
+  <div id="goalOverlay" class="overlay hidden">
+    <h1 id="goalTitle">ゴール!</h1>
+    <p id="goalStats"></p>
+    <button class="btn" id="retryBtn">もう一度 [Enter]</button>
+  </div>
+
+  <div id="pauseOverlay" class="overlay hidden">
+    <h1>PAUSE</h1>
+    <button class="btn" id="resumeBtn">再開 [P]</button>
+  </div>
+</div>
+
+<script>
+(() => {
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d');
+  const wrapEl = document.getElementById('wrap');
+  const speedValEl = document.getElementById('speedVal');
+  const distValEl = document.getElementById('distVal');
+  const distTotalEl = document.getElementById('distTotal');
+  const progressBarEl = document.getElementById('progressBar');
+  const bubbleEl = document.getElementById('bubble');
+  const crashFlashEl = document.getElementById('crashFlash');
+  const startOverlayEl = document.getElementById('startOverlay');
+  const goalOverlayEl = document.getElementById('goalOverlay');
+  const pauseOverlayEl = document.getElementById('pauseOverlay');
+  const goalTitleEl = document.getElementById('goalTitle');
+  const goalStatsEl = document.getElementById('goalStats');
+
+  // ---------- Responsive scale (reused pattern from tetris_ninniku.html) ----------
+  const popupMode = new URLSearchParams(location.search).get('popup') === '1';
+  function fitToWindow(){
+    wrapEl.style.transform = 'none';
+    const w = wrapEl.offsetWidth, h = wrapEl.offsetHeight;
+    const scale = Math.min(window.innerWidth / w, window.innerHeight / h, 1);
+    wrapEl.style.transform = scale < 1 ? `scale(${scale})` : 'none';
+  }
+  window.addEventListener('resize', fitToWindow);
+  window.addEventListener('orientationchange', fitToWindow);
+
+  // ---------- Key bindings (reused save/load pattern) ----------
+  const DEFAULT_KEYS = {
+    leanForward: ['ArrowDown', 'KeyS'],
+    leanBack: ['ArrowUp', 'KeyW'],
+    pause: ['KeyP', null],
+  };
+  const KEY_ACTIONS = Object.keys(DEFAULT_KEYS);
+  function cloneKeys(src){
+    const out = {};
+    KEY_ACTIONS.forEach(a => { out[a] = [src[a][0], src[a][1]]; });
+    return out;
+  }
+  let keyBindings = cloneKeys(DEFAULT_KEYS);
+  function loadKeyBindings(){
+    try{
+      const saved = JSON.parse(localStorage.getItem('ninniku-chari-keys') || '{}');
+      keyBindings = cloneKeys(DEFAULT_KEYS);
+      KEY_ACTIONS.forEach(a => {
+        const v = saved[a];
+        if(Array.isArray(v)){
+          keyBindings[a] = [
+            (typeof v[0] === 'string' || v[0] === null) ? v[0] : DEFAULT_KEYS[a][0],
+            (typeof v[1] === 'string' || v[1] === null) ? v[1] : null,
+          ];
+        }
+      });
+    }catch(e){ keyBindings = cloneKeys(DEFAULT_KEYS); }
+  }
+  function actionForCode(code){
+    for(const a of KEY_ACTIONS){ if(keyBindings[a].includes(code)) return a; }
+    return null;
+  }
+  loadKeyBindings();
+
+  const heldActions = new Set();
+  window.addEventListener('keydown', (e) => {
+    const action = actionForCode(e.code);
+    if(action){ e.preventDefault(); heldActions.add(action); }
+    if(action === 'pause'){ togglePause(); }
+    if(e.code === 'Enter' || e.code === 'Space'){
+      if(!startOverlayEl.classList.contains('hidden')){ startGame(); }
+      else if(!goalOverlayEl.classList.contains('hidden')){ startGame(); }
+    }
+  });
+  window.addEventListener('keyup', (e) => {
+    const action = actionForCode(e.code);
+    if(action){ heldActions.delete(action); }
+  });
+
+  // ---------- Terrain (stage 1 test course) ----------
+  // Points define a ground polyline. gapAfter:true means there is NO ground
+  // between this point and the next (a pit/ramp gap the player must jump).
+  const GROUND_BASE = 400;
+  const terrain = [
+    { x: 0,    y: GROUND_BASE },
+    { x: 450,  y: GROUND_BASE },
+    { x: 750,  y: GROUND_BASE + 60 },
+    { x: 1050, y: GROUND_BASE - 10 },
+    { x: 1300, y: GROUND_BASE - 120, gapAfter: true }, // ramp launch point
+    { x: 1750, y: GROUND_BASE - 20 },                   // landing slope start
+    { x: 2050, y: GROUND_BASE + 10 },
+    { x: 2450, y: GROUND_BASE - 50 },
+    { x: 2800, y: GROUND_BASE + 70 },
+    { x: 3150, y: GROUND_BASE },
+    { x: 3600, y: GROUND_BASE },
+    { x: 3900, y: GROUND_BASE }, // goal
+  ];
+  const GOAL_X = terrain[terrain.length - 1].x;
+
+  function findSegment(x){
+    for(let i = 0; i < terrain.length - 1; i++){
+      if(x >= terrain[i].x && x <= terrain[i+1].x) return i;
+    }
+    return x < terrain[0].x ? 0 : terrain.length - 2;
+  }
+
+  // Returns {y, angle} of ground at x, or null if x is inside a gap (no ground).
+  function groundInfoAt(x){
+    const i = findSegment(x);
+    const a = terrain[i], b = terrain[i+1];
+    if(a.gapAfter) return null;
+    const t = (x - a.x) / (b.x - a.x);
+    const y = a.y + (b.y - a.y) * t;
+    const angle = Math.atan2(b.y - a.y, b.x - a.x);
+    return { y, angle };
+  }
+
+  // ---------- Physics constants ----------
+  const GRAVITY = 1500;        // px/s^2
+  const PEDAL_ACCEL = 260;     // px/s^2 while leaning forward
+  const BRAKE_DECEL = 380;     // px/s^2 while leaning back (grounded)
+  const ROLL_FRICTION = 35;    // px/s^2 passive
+  const AIR_ROT_SPEED = 2.6;   // rad/s bike rotation control while airborne
+  const MAX_SPEED = 900;       // px/s
+  const LANDING_PERFECT_DEG = 10;
+  const LANDING_OK_DEG = 30;
+  const LANDING_CRASH_DEG = 55;
+
+  // ---------- Game state ----------
+  let state = 'start'; // 'start' | 'play' | 'paused' | 'crash' | 'goal'
+  let player, camX, elapsed, lastTime, crashTimer;
+
+  function resetPlayer(){
+    player = {
+      x: 0, y: GROUND_BASE, angle: 0,
+      speed: 60,          // scalar forward speed while grounded
+      vx: 0, vy: 0,        // used only while airborne
+      airborne: false,
+      wobble: 0,
+    };
+    camX = 0;
+    elapsed = 0;
+    crashTimer = 0;
+  }
+
+  function startGame(){
+    resetPlayer();
+    state = 'play';
+    startOverlayEl.classList.add('hidden');
+    goalOverlayEl.classList.add('hidden');
+    pauseOverlayEl.classList.add('hidden');
+    distTotalEl.textContent = Math.round(GOAL_X / 10);
+  }
+
+  function togglePause(){
+    if(state === 'play'){ state = 'paused'; pauseOverlayEl.classList.remove('hidden'); }
+    else if(state === 'paused'){ state = 'play'; pauseOverlayEl.classList.add('hidden'); lastTime = performance.now(); }
+  }
+
+  function triggerCrash(severity){
+    // severity 0..1, higher = worse crash
+    state = 'crash';
+    crashTimer = 500 + severity * 700;
+    player.speed *= (1 - severity * 0.8);
+    crashFlashEl.style.transition = 'none';
+    crashFlashEl.style.opacity = String(0.15 + severity * 0.35);
+    requestAnimationFrame(() => {
+      crashFlashEl.style.transition = 'opacity .4s';
+      crashFlashEl.style.opacity = '0';
+    });
+  }
+
+  function land(){
+    const info = groundInfoAt(player.x);
+    const groundAngle = info ? info.angle : 0;
+    const velAngle = Math.atan2(player.vy, player.vx);
+    let diffDeg = Math.abs((velAngle - groundAngle) * 180 / Math.PI);
+    diffDeg = Math.min(diffDeg, 360 - diffDeg);
+
+    const landedSpeed = Math.hypot(player.vx, player.vy);
+    player.airborne = false;
+    player.y = info ? info.y : player.y;
+    player.angle = groundAngle;
+
+    if(diffDeg <= LANDING_PERFECT_DEG){
+      // perfect landing: speed boost
+      player.speed = Math.min(MAX_SPEED, landedSpeed * 1.15);
+    } else if(diffDeg <= LANDING_OK_DEG){
+      player.speed = landedSpeed * 0.9;
+    } else if(diffDeg <= LANDING_CRASH_DEG){
+      player.speed = landedSpeed * 0.55;
+      triggerCrash(0.3);
+    } else {
+      player.speed = landedSpeed * 0.55;
+      triggerCrash(0.8);
+    }
+  }
+
+  function launch(){
+    const info = groundInfoAt(player.x - 0.01) || { angle: 0 };
+    player.airborne = true;
+    player.vx = player.speed * Math.cos(info.angle);
+    player.vy = player.speed * Math.sin(info.angle);
+  }
+
+  function updatePlay(dt){
+    elapsed += dt;
+    const leanFwd = heldActions.has('leanForward');
+    const leanBack = heldActions.has('leanBack');
+
+    if(!player.airborne){
+      const info = groundInfoAt(player.x);
+      if(info === null){
+        // walked off the ground into a gap without ramp geometry (shouldn't
+        // normally happen since ramp end triggers launch below) — treat as launch
+        launch();
+      } else {
+        player.y = info.y;
+        player.angle = info.angle;
+
+        let accel = -ROLL_FRICTION * Math.sign(player.speed || 1);
+        accel += GRAVITY * Math.sin(info.angle) * 0.5; // gravity along slope
+        if(leanFwd) accel += PEDAL_ACCEL;
+        if(leanBack) accel -= BRAKE_DECEL;
+
+        player.speed += accel * dt;
+        player.speed = Math.max(0, Math.min(MAX_SPEED, player.speed));
+        player.x += player.speed * dt;
+
+        // Did we just walk past the end of a ramp segment that has gapAfter?
+        const segIdx = findSegment(player.x);
+        const segA = terrain[segIdx];
+        if(segA.gapAfter && player.x >= segA.x){
+          player.x = segA.x;
+          launch();
+        }
+      }
+    } else {
+      player.vy += GRAVITY * dt;
+      if(leanFwd) player.angle += AIR_ROT_SPEED * dt;
+      if(leanBack) player.angle -= AIR_ROT_SPEED * dt;
+      player.x += player.vx * dt;
+      player.y += player.vy * dt;
+
+      const info = groundInfoAt(player.x);
+      if(info !== null && player.y >= info.y){
+        land();
+      }
+    }
+
+    if(player.x >= GOAL_X){
+      player.x = GOAL_X;
+      finishGoal();
+    }
+
+    camX = Math.max(0, player.x - 260);
+    speedValEl.textContent = Math.round(player.speed * 0.18); // arbitrary km/h scaling
+    distValEl.textContent = Math.round(player.x / 10);
+    progressBarEl.style.width = Math.min(100, (player.x / GOAL_X) * 100) + '%';
+  }
+
+  function updateCrash(dt){
+    crashTimer -= dt * 1000;
+    player.wobble += dt * 20;
+    if(!player.airborne){
+      const info = groundInfoAt(player.x);
+      if(info) { player.y = info.y; player.angle = info.angle + Math.sin(player.wobble) * 0.15; }
+      player.x += player.speed * dt;
+      player.speed = Math.max(0, player.speed - ROLL_FRICTION * dt);
+    } else {
+      player.vy += GRAVITY * dt;
+      player.x += player.vx * dt;
+      player.y += player.vy * dt;
+      player.angle += 6 * dt;
+      const info = groundInfoAt(player.x);
+      if(info !== null && player.y >= info.y){ player.airborne = false; player.y = info.y; }
+    }
+    camX = Math.max(0, player.x - 260);
+    if(crashTimer <= 0){ state = 'play'; }
+  }
+
+  function finishGoal(){
+    state = 'goal';
+    goalTitleEl.textContent = 'ゴール!';
+    goalStatsEl.textContent = 'タイム: ' + elapsed.toFixed(2) + ' 秒';
+    goalOverlayEl.classList.remove('hidden');
+  }
+
+  // ---------- Rendering ----------
+  function drawGround(){
+    ctx.fillStyle = '#5b3a1e';
+    ctx.strokeStyle = '#3f2a15';
+    ctx.lineWidth = 4;
+    let drawing = false;
+    ctx.beginPath();
+    for(let i = 0; i < terrain.length; i++){
+      const p = terrain[i];
+      const sx = p.x - camX;
+      if(!drawing){ ctx.moveTo(sx, p.y); drawing = true; }
+      else ctx.lineTo(sx, p.y);
+      if(p.gapAfter){
+        // close and fill this ground chunk, start a new one after the gap
+        ctx.lineTo(sx, 540);
+        ctx.lineTo((terrain[i].x - camX), 540);
+        ctx.closePath();
+        ctx.fill();
+        ctx.beginPath();
+        drawing = false;
+      }
+    }
+    if(drawing){
+      const last = terrain[terrain.length - 1];
+      ctx.lineTo(last.x - camX, 540);
+      ctx.lineTo(terrain[0].x - camX, 540);
+      ctx.closePath();
+      ctx.fill();
+    }
+    // stroke the surface line separately (thin skin over each ground chunk)
+    ctx.beginPath();
+    drawing = false;
+    for(let i = 0; i < terrain.length; i++){
+      const p = terrain[i];
+      const sx = p.x - camX;
+      if(!drawing){ ctx.moveTo(sx, p.y); drawing = true; } else ctx.lineTo(sx, p.y);
+      if(p.gapAfter){ ctx.stroke(); ctx.beginPath(); drawing = false; }
+    }
+    ctx.stroke();
+
+    // goal flag
+    const gx = GOAL_X - camX;
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(gx - 2, GROUND_BASE - 90, 4, 90);
+    ctx.fillStyle = '#C8481A';
+    ctx.beginPath();
+    ctx.moveTo(gx + 2, GROUND_BASE - 90);
+    ctx.lineTo(gx + 34, GROUND_BASE - 76);
+    ctx.lineTo(gx + 2, GROUND_BASE - 62);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  function drawPlayer(){
+    const sx = player.x - camX;
+    const sy = player.y;
+    ctx.save();
+    ctx.translate(sx, sy - 14);
+    ctx.rotate(player.angle);
+    // bike body
+    ctx.strokeStyle = '#222';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(-16, 10); ctx.lineTo(4, -6); ctx.lineTo(16, 10);
+    ctx.moveTo(4, -6); ctx.lineTo(-2, 10);
+    ctx.stroke();
+    ctx.fillStyle = '#333';
+    ctx.beginPath(); ctx.arc(-16, 12, 10, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(16, 12, 10, 0, Math.PI*2); ctx.fill();
+    // ninniku-man head (placeholder garlic shape)
+    ctx.fillStyle = '#F5E7C6';
+    ctx.strokeStyle = '#C8481A';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.ellipse(4, -22, 11, 13, 0, 0, Math.PI*2);
+    ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#3a2a12';
+    ctx.beginPath(); ctx.arc(8, -24, 1.6, 0, Math.PI*2); ctx.fill();
+    ctx.restore();
+  }
+
+  function draw(){
+    ctx.clearRect(0, 0, 960, 540);
+    // sky gradient
+    const grad = ctx.createLinearGradient(0, 0, 0, 540);
+    grad.addColorStop(0, '#6fc1ef');
+    grad.addColorStop(1, '#bfe8ff');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, 960, 540);
+
+    drawGround();
+    drawPlayer();
+  }
+
+  // ---------- Main loop ----------
+  function loop(now){
+    if(!lastTime) lastTime = now;
+    const dt = Math.min(0.033, (now - lastTime) / 1000);
+    lastTime = now;
+
+    if(state === 'play') updatePlay(dt);
+    else if(state === 'crash') updateCrash(dt);
+
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  document.getElementById('startBtn').addEventListener('click', startGame);
+  document.getElementById('retryBtn').addEventListener('click', startGame);
+  document.getElementById('resumeBtn').addEventListener('click', togglePause);
+
+  resetPlayer();
+  distTotalEl.textContent = Math.round(GOAL_X / 10);
+  fitToWindow();
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
