@@ -21,6 +21,7 @@
   #versionLabel{ position:absolute; bottom:44px; right:14px; color:rgba(255,255,255,.55); font-size:11px; font-weight:bold; text-shadow:0 1px 2px rgba(0,0,0,.5); pointer-events:none; }
   #hud{ position:absolute; top:10px; left:10px; right:10px; display:flex; justify-content:space-between; pointer-events:none; color:#fff; text-shadow:0 1px 3px rgba(0,0,0,.6); font-size:15px; font-weight:bold; }
   #hud .box{ background:rgba(0,0,0,.35); padding:6px 12px; border-radius:8px; }
+  #timeHud{ position:absolute; top:44px; right:10px; color:#fff; text-shadow:0 1px 3px rgba(0,0,0,.6); font-size:15px; font-weight:bold; pointer-events:none; }
   #mascotImg{ position:absolute; top:6px; left:400px; width:52px; height:auto; filter:drop-shadow(0 2px 4px rgba(0,0,0,.4)); }
   #bubble{ position:absolute; top:12px; left:458px; background:#fff; border:2px solid #C8481A; border-radius:14px; padding:6px 14px; font-size:13px; font-weight:bold; color:#4a2c0f; white-space:nowrap; }
   .overlay{ position:absolute; inset:0; background:rgba(10,20,30,.72); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; color:#fff; text-align:center; }
@@ -33,6 +34,18 @@
   .btn-row{ display:flex; gap:12px; }
   .gameover-selected{ background:#F3980D !important; color:#fff !important; box-shadow:0 4px 0 #a5650a !important; }
   .gameover-unselected{ background:#fff !important; color:#C8481A !important; box-shadow:0 4px 0 #cbb9a0 !important; }
+  #nameInput{ width:220px; padding:9px 12px; border-radius:8px; border:2px solid #C8481A; font-size:15px; text-align:center; margin-bottom:10px; }
+  #rankResultText{ margin:8px 0 0; font-size:14px; color:#FFD23F; font-weight:bold; }
+  #rankingEntries{ list-style:none; margin:0; padding:0; width:420px; max-height:340px; overflow-y:auto; background:rgba(0,0,0,.25); border-radius:10px; }
+  #rankingEntries li{ display:flex; align-items:center; gap:10px; padding:7px 14px; font-size:14px; border-bottom:1px solid rgba(255,255,255,.12); }
+  #rankingEntries li:last-child{ border-bottom:none; }
+  .rank-no{ width:52px; font-weight:bold; color:#cfd8e3; flex-shrink:0; }
+  .rank-gold{ color:#FFD23F; }
+  .rank-silver{ color:#D6D9DD; }
+  .rank-bronze{ color:#D9915B; }
+  .rank-name{ flex:1; text-align:left; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .rank-val{ font-weight:bold; color:#F3980D; flex-shrink:0; }
+  .rank-empty{ text-align:center; color:#cfd8e3; padding:16px; justify-content:center; }
   #progressWrap{ position:absolute; bottom:10px; left:10px; right:10px; height:10px; background:rgba(0,0,0,.35); border-radius:6px; overflow:hidden; }
   #progressBar{ height:100%; width:0%; background:linear-gradient(90deg,#F3980D,#C8481A); }
   #crashFlash{ position:absolute; inset:0; background:#ff0000; opacity:0; pointer-events:none; }
@@ -45,6 +58,7 @@
     <div class="box">速度: <span id="speedVal">0</span> km/h</div>
     <div class="box">距離: <span id="distVal">0</span> / <span id="distTotal">0</span> m</div>
   </div>
+  <div id="timeHud" class="box">タイム: <span id="timeVal">0.00</span> 秒</div>
   <img id="mascotImg" alt="ニンニクマン">
   <div id="bubble">がんばって〜!</div>
   <div id="progressWrap"><div id="progressBar"></div></div>
@@ -59,15 +73,30 @@
     <h1>走れニンニクマン</h1>
     <p>一定速度で自動的に走ります。加速・ブレーキ操作は不要!<br>Space(スマホはタップ): ジャンプ(穴や障害物にぶつかるとゲームオーバー!)<br>↑↓: 空中での姿勢制御(着地角度で失速・爆速が変わる)</p>
     <button class="btn" id="startBtn">スタート [Enter]</button>
+    <button class="btn secondary" id="rankingBtn">ランキング</button>
   </div>
 
   <div id="goalOverlay" class="overlay hidden">
     <h1 id="goalTitle">ゴール!</h1>
     <p id="goalStats"></p>
+    <div id="scoreSubmit" class="hidden">
+      <input id="nameInput" type="text" maxlength="12" placeholder="なまえ(12文字まで)">
+      <div class="btn-row">
+        <button class="btn" id="submitScoreBtn">ランキングに登録</button>
+        <button class="btn secondary" id="shareScoreBtn">Xでシェア</button>
+      </div>
+      <p id="rankResultText" class="hidden"></p>
+    </div>
     <div class="btn-row">
       <button class="btn" id="retryBtn">もう一度</button>
       <button class="btn secondary" id="backToStartBtn">スタートに戻る</button>
     </div>
+  </div>
+
+  <div id="rankingOverlay" class="overlay hidden">
+    <h1>ランキング</h1>
+    <ul id="rankingEntries"></ul>
+    <button class="btn" id="closeRankingBtn">とじる</button>
   </div>
 
   <div id="pauseOverlay" class="overlay hidden">
@@ -88,6 +117,7 @@ const JUMP_VOICE_3_SRC = "data:audio/wav;base64,UklGRg7OAABXQVZFZm10IBIAAAABAAEA
   const speedValEl = document.getElementById('speedVal');
   const distValEl = document.getElementById('distVal');
   const distTotalEl = document.getElementById('distTotal');
+  const timeValEl = document.getElementById('timeVal');
   const progressBarEl = document.getElementById('progressBar');
   const bubbleEl = document.getElementById('bubble');
   const mascotImgEl = document.getElementById('mascotImg');
@@ -133,6 +163,15 @@ const JUMP_VOICE_3_SRC = "data:audio/wav;base64,UklGRg7OAABXQVZFZm10IBIAAAABAAEA
   const tcLeanBackEl = document.getElementById('tcLeanBack');
   const tcLeanFwdEl = document.getElementById('tcLeanFwd');
   const tcHintEl = document.getElementById('tcHint');
+  const rankingBtnEl = document.getElementById('rankingBtn');
+  const rankingOverlayEl = document.getElementById('rankingOverlay');
+  const rankingEntriesEl = document.getElementById('rankingEntries');
+  const closeRankingBtnEl = document.getElementById('closeRankingBtn');
+  const scoreSubmitEl = document.getElementById('scoreSubmit');
+  const nameInputEl = document.getElementById('nameInput');
+  const submitScoreBtnEl = document.getElementById('submitScoreBtn');
+  const shareScoreBtnEl = document.getElementById('shareScoreBtn');
+  const rankResultTextEl = document.getElementById('rankResultText');
 
   // ---------- Responsive scale (reused pattern from tetris_ninniku.html) ----------
   const popupMode = new URLSearchParams(location.search).get('popup') === '1';
@@ -182,6 +221,11 @@ const JUMP_VOICE_3_SRC = "data:audio/wav;base64,UklGRg7OAABXQVZFZm10IBIAAAABAAEA
 
   const heldActions = new Set();
   window.addEventListener('keydown', (e) => {
+    if(e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+    if(!rankingOverlayEl.classList.contains('hidden')){
+      if(e.code === 'Escape' || e.code === 'Enter' || e.code === 'Space'){ e.preventDefault(); closeRanking(); }
+      return;
+    }
     const action = actionForCode(e.code);
     if(action){ e.preventDefault(); heldActions.add(action); }
     if(action === 'pause'){ togglePause(); }
@@ -320,7 +364,9 @@ const JUMP_VOICE_3_SRC = "data:audio/wav;base64,UklGRg7OAABXQVZFZm10IBIAAAABAAEA
     startOverlayEl.classList.add('hidden');
     goalOverlayEl.classList.add('hidden');
     pauseOverlayEl.classList.add('hidden');
+    hideScoreSubmit();
     distTotalEl.textContent = Math.round(GOAL_X / 10);
+    timeValEl.textContent = '0.00';
   }
 
   function updateIntro(dt){
@@ -375,6 +421,7 @@ const JUMP_VOICE_3_SRC = "data:audio/wav;base64,UklGRg7OAABXQVZFZm10IBIAAAABAAEA
     goalStatsEl.textContent = reason;
     resultFocusIndex = 0;
     updateResultFocus();
+    hideScoreSubmit();
     goalOverlayEl.classList.remove('hidden');
     crashFlashEl.style.transition = 'none';
     crashFlashEl.style.opacity = '0.5';
@@ -527,15 +574,158 @@ const JUMP_VOICE_3_SRC = "data:audio/wav;base64,UklGRg7OAABXQVZFZm10IBIAAAABAAEA
     camX = Math.max(0, player.x - 260);
     speedValEl.textContent = Math.round(player.speed * 0.18); // arbitrary km/h scaling
     distValEl.textContent = Math.round(player.x / 10);
+    timeValEl.textContent = elapsed.toFixed(2);
     progressBarEl.style.width = Math.min(100, (player.x / GOAL_X) * 100) + '%';
   }
+
+  // ---------- ランキング(一時的にtetris_ninniku.htmlと同じ構成で追加) ----------
+  const RANKING_FILE = 'ranking-clear.json';
+  // Cloudflare Workerを経由してGitHub Issue化し、GitHub Actionsでranking-clear.jsonを更新する。
+  // Worker未デプロイの間は登録に失敗するだけで、閲覧(ランキング表示)は空一覧として動作する。
+  const RANKING_SUBMIT_URL = 'https://REPLACE-ME.workers.dev/';
+  let pendingSubmit = null;
+
+  function formatClearTime(ms){
+    const totalMs = Math.round(ms);
+    const m = Math.floor(totalMs / 60000);
+    const s = Math.floor((totalMs % 60000) / 1000);
+    const cs = Math.floor((totalMs % 1000) / 10);
+    return (m > 0 ? m + ':' + String(s).padStart(2, '0') : s) + '.' + String(cs).padStart(2, '0');
+  }
+
+  async function fetchRanking(){
+    try{
+      const res = await fetch(RANKING_FILE, { cache: 'no-store' });
+      if(!res.ok) return null;
+      const list = await res.json();
+      return Array.isArray(list) ? list : [];
+    }catch(e){ return null; }
+  }
+
+  async function checkAndShowRank(valueMs){
+    rankResultTextEl.textContent = '順位を確認中…';
+    rankResultTextEl.classList.remove('hidden');
+    const list = await fetchRanking();
+    if(!pendingSubmit || pendingSubmit.value !== valueMs) return;
+    if(list === null){
+      rankResultTextEl.classList.add('hidden');
+      return;
+    }
+    let rank = list.findIndex(e => valueMs < e.value);
+    if(rank === -1) rank = list.length;
+    rank += 1;
+    rankResultTextEl.textContent = '現在の順位: ' + rank + '位';
+  }
+
+  async function renderRankingList(){
+    rankingEntriesEl.innerHTML = '';
+    const loadingLi = document.createElement('li');
+    loadingLi.textContent = '読み込み中…';
+    loadingLi.className = 'rank-empty';
+    rankingEntriesEl.appendChild(loadingLi);
+    const list = await fetchRanking();
+    rankingEntriesEl.innerHTML = '';
+    if(list === null){
+      const li = document.createElement('li');
+      li.textContent = 'ランキングを取得できませんでした';
+      li.className = 'rank-empty';
+      rankingEntriesEl.appendChild(li);
+      return;
+    }
+    if(list.length === 0){
+      const li = document.createElement('li');
+      li.textContent = 'まだ記録がありません';
+      li.className = 'rank-empty';
+      rankingEntriesEl.appendChild(li);
+      return;
+    }
+    list.forEach((e, i) => {
+      const li = document.createElement('li');
+      const medalClass = i === 0 ? ' rank-gold' : i === 1 ? ' rank-silver' : i === 2 ? ' rank-bronze' : '';
+      const noSpan = document.createElement('span');
+      noSpan.className = 'rank-no' + medalClass;
+      noSpan.textContent = (i + 1) + '位';
+      const nameSpan = document.createElement('span');
+      nameSpan.className = 'rank-name';
+      nameSpan.textContent = e.name || '名無しさん';
+      const valSpan = document.createElement('span');
+      valSpan.className = 'rank-val';
+      valSpan.textContent = formatClearTime(e.value);
+      li.append(noSpan, nameSpan, valSpan);
+      rankingEntriesEl.appendChild(li);
+    });
+  }
+
+  function openRanking(){
+    rankingOverlayEl.classList.remove('hidden');
+    renderRankingList();
+  }
+  function closeRanking(){
+    rankingOverlayEl.classList.add('hidden');
+  }
+
+  function showScoreSubmit(valueMs){
+    pendingSubmit = { value: valueMs };
+    let savedName = '';
+    try{ savedName = localStorage.getItem('ninniku-chari-playername') || ''; }catch(e){ /* ignore */ }
+    nameInputEl.value = savedName;
+    submitScoreBtnEl.textContent = 'ランキングに登録';
+    submitScoreBtnEl.disabled = false;
+    shareScoreBtnEl.textContent = 'Xでシェア';
+    scoreSubmitEl.classList.remove('hidden');
+  }
+  function hideScoreSubmit(){
+    pendingSubmit = null;
+    scoreSubmitEl.classList.add('hidden');
+  }
+
+  submitScoreBtnEl.addEventListener('click', async () => {
+    if(!pendingSubmit) return;
+    let name = nameInputEl.value.replace(/[\r\n]/g, '').trim().slice(0, 12);
+    if(!name) name = '名無しさん';
+    try{ localStorage.setItem('ninniku-chari-playername', name); }catch(e){ /* ignore */ }
+    const { value } = pendingSubmit;
+    submitScoreBtnEl.disabled = true;
+    submitScoreBtnEl.textContent = '登録中…';
+    try{
+      const res = await fetch(RANKING_SUBMIT_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'clear', value, name }),
+      });
+      const data = await res.json().catch(() => null);
+      if(res.ok && data && data.ok){
+        submitScoreBtnEl.textContent = '登録しました！反映まで少々お待ちください';
+      } else {
+        submitScoreBtnEl.textContent = '登録に失敗しました。もう一度お試しください';
+        submitScoreBtnEl.disabled = false;
+      }
+    }catch(e){
+      submitScoreBtnEl.textContent = '登録に失敗しました(通信エラー)';
+      submitScoreBtnEl.disabled = false;
+    }
+  });
+
+  shareScoreBtnEl.addEventListener('click', () => {
+    if(!pendingSubmit) return;
+    const text = '走れニンニクマンで500mを ' + formatClearTime(pendingSubmit.value) + ' でクリアしました！ #走れニンニクマン';
+    const url = location.href;
+    const intentUrl = 'https://twitter.com/intent/tweet?text=' + encodeURIComponent(text) + '&url=' + encodeURIComponent(url);
+    window.open(intentUrl, '_blank', 'noopener,noreferrer');
+  });
+
+  rankingBtnEl.addEventListener('click', openRanking);
+  closeRankingBtnEl.addEventListener('click', closeRanking);
 
   function finishGoal(){
     state = 'goal';
     goalTitleEl.textContent = 'ゴール!';
-    goalStatsEl.textContent = 'タイム: ' + elapsed.toFixed(2) + ' 秒';
+    const finalMs = elapsed * 1000;
+    goalStatsEl.textContent = 'タイム: ' + formatClearTime(finalMs);
     resultFocusIndex = 0;
     updateResultFocus();
+    showScoreSubmit(finalMs);
+    checkAndShowRank(finalMs);
     goalOverlayEl.classList.remove('hidden');
   }
 
