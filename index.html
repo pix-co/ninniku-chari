@@ -39,7 +39,7 @@
 
   <div id="startOverlay" class="overlay">
     <h1>ニンニクマンチャリ走</h1>
-    <p>↓(前傾): 加速 / ↑(後傾): ブレーキ・空中姿勢制御<br>ジャンプ台に乗ると自動でジャンプします。着地角度で失速・爆速が変わる!</p>
+    <p>一定速度で自動的に走ります。加速・ブレーキ操作は不要!<br>Space: ジャンプ(穴や障害物は自分でジャンプして避けよう)<br>↑↓: 空中での姿勢制御(着地角度で失速・爆速が変わる)</p>
     <button class="btn" id="startBtn">スタート [Enter]</button>
   </div>
 
@@ -94,6 +94,7 @@ const NINNIKU_CHAR_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAXsAAAGQ
   const DEFAULT_KEYS = {
     leanForward: ['ArrowDown', 'KeyS'],
     leanBack: ['ArrowUp', 'KeyW'],
+    jump: ['Space', null],
     pause: ['KeyP', null],
   };
   const KEY_ACTIONS = Object.keys(DEFAULT_KEYS);
@@ -129,6 +130,8 @@ const NINNIKU_CHAR_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAXsAAAGQ
     const action = actionForCode(e.code);
     if(action){ e.preventDefault(); heldActions.add(action); }
     if(action === 'pause'){ togglePause(); }
+    if(action === 'jump' && !e.repeat){ tryJump(); }
+    if(e.code === 'Escape' && state !== 'start'){ backToStart(); }
     if(e.code === 'Enter' || e.code === 'Space'){
       if(!startOverlayEl.classList.contains('hidden')){ startGame(); }
       else if(!goalOverlayEl.classList.contains('hidden')){ startGame(); }
@@ -143,21 +146,30 @@ const NINNIKU_CHAR_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAXsAAAGQ
   // Points define a ground polyline. gapAfter:true means there is NO ground
   // between this point and the next (a pit/ramp gap the player must jump).
   const GROUND_BASE = 400;
+  // gapAfter区間(1300→1450, 150px)は巡航速度300px/s + ジャンプ初速420px/sなら
+  // 余裕をもって飛び越えられる距離に調整済み(以前は450px近くあり必ず届かなかった)
   const terrain = [
     { x: 0,    y: GROUND_BASE },
     { x: 450,  y: GROUND_BASE },
     { x: 750,  y: GROUND_BASE + 60 },
     { x: 1050, y: GROUND_BASE - 10 },
-    { x: 1300, y: GROUND_BASE - 120, gapAfter: true }, // ramp launch point
-    { x: 1750, y: GROUND_BASE - 20 },                   // landing slope start
-    { x: 2050, y: GROUND_BASE + 10 },
-    { x: 2450, y: GROUND_BASE - 50 },
-    { x: 2800, y: GROUND_BASE + 70 },
-    { x: 3150, y: GROUND_BASE },
-    { x: 3600, y: GROUND_BASE },
-    { x: 3900, y: GROUND_BASE }, // goal
+    { x: 1300, y: GROUND_BASE - 40, gapAfter: true }, // ジャンプ台
+    { x: 1450, y: GROUND_BASE - 10 },                  // 着地斜面
+    { x: 1750, y: GROUND_BASE + 10 },
+    { x: 2150, y: GROUND_BASE - 50 },
+    { x: 2500, y: GROUND_BASE + 70 },
+    { x: 2850, y: GROUND_BASE },
+    { x: 3300, y: GROUND_BASE },
+    { x: 3600, y: GROUND_BASE }, // goal
   ];
   const GOAL_X = terrain[terrain.length - 1].x;
+
+  // Solid obstacles sitting on the ground — jump over them or crash into them.
+  const OBSTACLES = [
+    { x: 550,  w: 26, h: 24 },
+    { x: 2200, w: 30, h: 26 },
+    { x: 2950, w: 24, h: 22 },
+  ];
 
   function findSegment(x){
     for(let i = 0; i < terrain.length - 1; i++){
@@ -178,12 +190,16 @@ const NINNIKU_CHAR_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAXsAAAGQ
   }
 
   // ---------- Physics constants ----------
-  const GRAVITY = 1500;        // px/s^2
-  const PEDAL_ACCEL = 260;     // px/s^2 while leaning forward
-  const BRAKE_DECEL = 380;     // px/s^2 while leaning back (grounded)
-  const ROLL_FRICTION = 35;    // px/s^2 passive
-  const AIR_ROT_SPEED = 2.6;   // rad/s bike rotation control while airborne
-  const MAX_SPEED = 900;       // px/s
+  // チャリ走は一定速度で自動的に走り続けるゲームなので、加速・ブレーキ操作は無い。
+  // プレイヤーが操作するのはジャンプのタイミングと、空中での姿勢(着地角度)のみ。
+  const GRAVITY = 1500;          // px/s^2
+  const CRUISE_SPEED = 300;      // px/s — 常にこの速度で走り続ける(操作不要)
+  const SPEED_RECOVERY = 2.2;    // ジャンプ後の速度が巡航速度へ戻る速さ
+  const CRASH_FRICTION = 220;    // px/s^2 — クラッシュでよろけている間だけ減速
+  const AIR_ROT_SPEED = 2.6;     // rad/s bike rotation control while airborne
+  const MAX_SPEED = 900;         // px/s
+  const JUMP_IMPULSE = 420;      // upward kick from a manual jump (px/s)
+  const PIT_FALL_Y = 640;        // falling past this = missed the jump, into the pit
   const LANDING_PERFECT_DEG = 10;
   const LANDING_OK_DEG = 30;
   const LANDING_CRASH_DEG = 55;
@@ -195,10 +211,11 @@ const NINNIKU_CHAR_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAXsAAAGQ
   function resetPlayer(){
     player = {
       x: 0, y: GROUND_BASE, angle: 0,
-      speed: 60,          // scalar forward speed while grounded
+      speed: CRUISE_SPEED, // scalar forward speed while grounded
       vx: 0, vy: 0,        // used only while airborne
       airborne: false,
       wobble: 0,
+      legPhase: 0,
     };
     camX = 0;
     elapsed = 0;
@@ -217,6 +234,13 @@ const NINNIKU_CHAR_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAXsAAAGQ
   function togglePause(){
     if(state === 'play'){ state = 'paused'; pauseOverlayEl.classList.remove('hidden'); }
     else if(state === 'paused'){ state = 'play'; pauseOverlayEl.classList.add('hidden'); lastTime = performance.now(); }
+  }
+
+  function backToStart(){
+    state = 'start';
+    goalOverlayEl.classList.add('hidden');
+    pauseOverlayEl.classList.add('hidden');
+    startOverlayEl.classList.remove('hidden');
   }
 
   function triggerCrash(severity){
@@ -258,11 +282,48 @@ const NINNIKU_CHAR_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAXsAAAGQ
     }
   }
 
-  function launch(){
-    const info = groundInfoAt(player.x - 0.01) || { angle: 0 };
+  function tryJump(){
+    if(state !== 'play' || player.airborne) return;
+    const info = groundInfoAt(player.x);
+    const angle = info ? info.angle : 0;
     player.airborne = true;
-    player.vx = player.speed * Math.cos(info.angle);
-    player.vy = player.speed * Math.sin(info.angle);
+    player.vx = player.speed * Math.cos(angle);
+    player.vy = player.speed * Math.sin(angle) - JUMP_IMPULSE;
+  }
+
+  function checkObstacleHit(){
+    for(const ob of OBSTACLES){
+      if(player.x + 9 < ob.x || player.x - 9 > ob.x + ob.w) continue;
+      const info = groundInfoAt(Math.min(Math.max(player.x, ob.x), ob.x + ob.w));
+      const groundY = info ? info.y : GROUND_BASE;
+      const clearance = groundY - player.y; // how high above local ground the player currently is
+      if(clearance < ob.h){
+        triggerCrash(0.55);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function fallIntoPit(){
+    state = 'crash';
+    crashTimer = 900;
+    let i = findSegment(player.x);
+    while(i > 0 && terrain[i-1].gapAfter) i--;
+    const respawnX = Math.max(0, terrain[i].x - 30);
+    const info = groundInfoAt(respawnX);
+    player.x = respawnX;
+    player.y = info ? info.y : GROUND_BASE;
+    player.angle = info ? info.angle : 0;
+    player.airborne = false;
+    player.vx = 0; player.vy = 0;
+    player.speed = Math.max(40, player.speed * 0.3);
+    crashFlashEl.style.transition = 'none';
+    crashFlashEl.style.opacity = '0.5';
+    requestAnimationFrame(() => {
+      crashFlashEl.style.transition = 'opacity .4s';
+      crashFlashEl.style.opacity = '0';
+    });
   }
 
   function updatePlay(dt){
@@ -273,36 +334,31 @@ const NINNIKU_CHAR_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAXsAAAGQ
     if(!player.airborne){
       const info = groundInfoAt(player.x);
       if(info === null){
-        // walked off the ground into a gap without ramp geometry (shouldn't
-        // normally happen since ramp end triggers launch below) — treat as launch
-        launch();
+        // walked past the edge without jumping in time — start falling into the pit
+        player.airborne = true;
+        player.vx = player.speed;
+        player.vy = 0;
       } else {
         player.y = info.y;
         player.angle = info.angle;
 
-        let accel = -ROLL_FRICTION * Math.sign(player.speed || 1);
-        accel += GRAVITY * Math.sin(info.angle) * 0.5; // gravity along slope
-        if(leanFwd) accel += PEDAL_ACCEL;
-        if(leanBack) accel -= BRAKE_DECEL;
-
-        player.speed += accel * dt;
-        player.speed = Math.max(0, Math.min(MAX_SPEED, player.speed));
+        // 一定速度で走り続ける。ジャンプの着地直後だけ一時的に速度がずれるので
+        // 巡航速度へ滑らかに戻す(加速・ブレーキ操作はしなくてよい)
+        player.speed += (CRUISE_SPEED - player.speed) * SPEED_RECOVERY * dt;
         player.x += player.speed * dt;
-
-        // Did we just walk past the end of a ramp segment that has gapAfter?
-        const segIdx = findSegment(player.x);
-        const segA = terrain[segIdx];
-        if(segA.gapAfter && player.x >= segA.x){
-          player.x = segA.x;
-          launch();
-        }
+        player.legPhase = (player.legPhase + player.speed * dt * 0.05) % (Math.PI * 2);
       }
-    } else {
+    }
+
+    if(player.airborne){
       player.vy += GRAVITY * dt;
       if(leanFwd) player.angle += AIR_ROT_SPEED * dt;
       if(leanBack) player.angle -= AIR_ROT_SPEED * dt;
       player.x += player.vx * dt;
       player.y += player.vy * dt;
+      player.legPhase += dt * 6;
+
+      if(player.y > PIT_FALL_Y){ fallIntoPit(); return; }
 
       const info = groundInfoAt(player.x);
       if(info !== null && player.y >= info.y){
@@ -310,7 +366,9 @@ const NINNIKU_CHAR_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAXsAAAGQ
       }
     }
 
-    if(player.x >= GOAL_X){
+    if(state === 'play') checkObstacleHit();
+
+    if(state === 'play' && player.x >= GOAL_X){
       player.x = GOAL_X;
       finishGoal();
     }
@@ -328,7 +386,7 @@ const NINNIKU_CHAR_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAXsAAAGQ
       const info = groundInfoAt(player.x);
       if(info) { player.y = info.y; player.angle = info.angle + Math.sin(player.wobble) * 0.15; }
       player.x += player.speed * dt;
-      player.speed = Math.max(0, player.speed - ROLL_FRICTION * dt);
+      player.speed = Math.max(0, player.speed - CRASH_FRICTION * dt);
     } else {
       player.vy += GRAVITY * dt;
       player.x += player.vx * dt;
@@ -401,6 +459,45 @@ const NINNIKU_CHAR_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAXsAAAGQ
     ctx.fill();
   }
 
+  function drawObstacles(){
+    ctx.fillStyle = '#6b6258';
+    ctx.strokeStyle = '#3f3a33';
+    ctx.lineWidth = 2;
+    for(const ob of OBSTACLES){
+      const info = groundInfoAt(ob.x + ob.w / 2);
+      const baseY = info ? info.y : GROUND_BASE;
+      const gx = ob.x - camX;
+      ctx.beginPath();
+      ctx.moveTo(gx, baseY);
+      ctx.lineTo(gx + ob.w * 0.3, baseY - ob.h);
+      ctx.lineTo(gx + ob.w * 0.7, baseY - ob.h);
+      ctx.lineTo(gx + ob.w, baseY);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    }
+  }
+
+  function drawLegs(phase){
+    const hip = { x: 3, y: -3 };
+    const crank = { x: -2, y: 9 };
+    const r = 7;
+    ctx.strokeStyle = '#e8dcc0';
+    ctx.lineWidth = 5;
+    ctx.lineCap = 'round';
+    for(let i = 0; i < 2; i++){
+      const p = phase + i * Math.PI;
+      const fx = crank.x + Math.cos(p) * r;
+      const fy = crank.y + Math.sin(p) * r * 0.6;
+      ctx.beginPath();
+      ctx.moveTo(hip.x, hip.y);
+      ctx.lineTo(fx, fy);
+      ctx.stroke();
+      ctx.fillStyle = '#8a6d3b';
+      ctx.beginPath(); ctx.arc(fx, fy, 2.4, 0, Math.PI*2); ctx.fill();
+    }
+  }
+
   function drawPlayer(){
     const sx = player.x - camX;
     const sy = player.y;
@@ -417,10 +514,16 @@ const NINNIKU_CHAR_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAXsAAAGQ
     ctx.fillStyle = '#333';
     ctx.beginPath(); ctx.arc(-16, 12, 10, 0, Math.PI*2); ctx.fill();
     ctx.beginPath(); ctx.arc(16, 12, 10, 0, Math.PI*2); ctx.fill();
-    // ニンニクマン本体
+
+    // ペダルを漕ぐ脚(画像の脚部分はクロップし、代わりにここで円運動させる)
+    drawLegs(player.legPhase);
+
+    // ニンニクマン本体(頭〜腰。脚は上のdrawLegsで表現するため画像下部はクロップ)
     if(charImg.complete && charImg.naturalWidth){
-      const cw = 32, ch = cw * (400/379);
-      ctx.drawImage(charImg, -cw/2 + 2, -ch + 6, cw, ch);
+      const cw = 32, srcW = 379, srcH = 300; // 300/400 = 元画像の脚を除いた上半身部分
+      const ch = cw * (srcH / srcW);
+      const hipY = -3;
+      ctx.drawImage(charImg, 0, 0, srcW, srcH, -cw/2 + 2, hipY - ch, cw, ch);
     } else {
       ctx.fillStyle = '#F5E7C6';
       ctx.strokeStyle = '#C8481A';
@@ -442,6 +545,7 @@ const NINNIKU_CHAR_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAXsAAAGQ
     ctx.fillRect(0, 0, 960, 540);
 
     drawGround();
+    drawObstacles();
     drawPlayer();
   }
 
