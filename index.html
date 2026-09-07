@@ -329,6 +329,11 @@ const NINNIKU_CHAR_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAXsAAAGQ
       // 着地が乱れても失速するだけ。クラッシュ演出(ダメージ)は出さない
       player.speed = landedSpeed * 0.65;
     }
+
+    // 着地と同時にジャンプ入力があれば、タイミングを讃えて少し加速する
+    if(heldActions.has('jump')){
+      player.speed = Math.min(MAX_SPEED, player.speed * 1.08);
+    }
   }
 
   function tryJump(){
