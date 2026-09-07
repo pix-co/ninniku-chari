@@ -582,7 +582,7 @@ const JUMP_VOICE_3_SRC = "data:audio/wav;base64,UklGRg7OAABXQVZFZm10IBIAAAABAAEA
   const RANKING_FILE = 'ranking-clear.json';
   // Cloudflare Workerを経由してGitHub Issue化し、GitHub Actionsでranking-clear.jsonを更新する。
   // Worker未デプロイの間は登録に失敗するだけで、閲覧(ランキング表示)は空一覧として動作する。
-  const RANKING_SUBMIT_URL = 'https://REPLACE-ME.workers.dev/';
+  const RANKING_SUBMIT_URL = 'https://ninniku-chari.rapidpredict.workers.dev/';
   let pendingSubmit = null;
 
   function formatClearTime(ms){
