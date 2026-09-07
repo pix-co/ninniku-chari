@@ -9,7 +9,14 @@
   html,body{ margin:0; padding:0; background:#1b2a3a; height:100%; overflow:hidden; }
   body{ display:flex; align-items:center; justify-content:center; font-family:'Yu Gothic',Meiryo,sans-serif; }
   #wrap{ position:relative; width:960px; height:540px; transform-origin: center center; }
-  canvas{ display:block; width:960px; height:540px; background:#8fd0f2; border-radius:10px; box-shadow:0 8px 30px rgba(0,0,0,.5); }
+  canvas{ display:block; width:960px; height:540px; background:#8fd0f2; border-radius:10px; box-shadow:0 8px 30px rgba(0,0,0,.5); touch-action:none; }
+  .touchBtn{ position:absolute; width:74px; height:74px; border-radius:50%; background:rgba(255,255,255,.28); border:3px solid rgba(255,255,255,.65); color:#fff; font-size:26px; font-weight:bold; display:none; align-items:center; justify-content:center; user-select:none; -webkit-user-select:none; touch-action:none; }
+  .touchBtn.show{ display:flex; }
+  .touchBtn:active{ background:rgba(255,255,255,.5); }
+  #tcLeanBack{ left:22px; bottom:112px; }
+  #tcLeanFwd{ left:22px; bottom:22px; }
+  #tcHint{ position:absolute; bottom:26px; right:22px; color:#fff; font-size:13px; font-weight:bold; text-shadow:0 1px 3px rgba(0,0,0,.6); display:none; }
+  #tcHint.show{ display:block; }
   #hud{ position:absolute; top:10px; left:10px; right:10px; display:flex; justify-content:space-between; pointer-events:none; color:#fff; text-shadow:0 1px 3px rgba(0,0,0,.6); font-size:15px; font-weight:bold; }
   #hud .box{ background:rgba(0,0,0,.35); padding:6px 12px; border-radius:8px; }
   #mascotImg{ position:absolute; top:6px; left:400px; width:52px; height:auto; filter:drop-shadow(0 2px 4px rgba(0,0,0,.4)); }
@@ -40,10 +47,13 @@
   <div id="bubble">がんばって〜!</div>
   <div id="progressWrap"><div id="progressBar"></div></div>
   <div id="crashFlash"></div>
+  <button class="touchBtn" id="tcLeanBack" type="button">↑</button>
+  <button class="touchBtn" id="tcLeanFwd" type="button">↓</button>
+  <div id="tcHint">タップでジャンプ</div>
 
   <div id="startOverlay" class="overlay">
     <h1>走れニンニクマン</h1>
-    <p>一定速度で自動的に走ります。加速・ブレーキ操作は不要!<br>Space: ジャンプ(穴や障害物にぶつかるとゲームオーバー!)<br>↑↓: 空中での姿勢制御(着地角度で失速・爆速が変わる)</p>
+    <p>一定速度で自動的に走ります。加速・ブレーキ操作は不要!<br>Space(スマホはタップ): ジャンプ(穴や障害物にぶつかるとゲームオーバー!)<br>↑↓: 空中での姿勢制御(着地角度で失速・爆速が変わる)</p>
     <button class="btn" id="startBtn">スタート [Enter]</button>
   </div>
 
@@ -87,6 +97,9 @@ const NINNIKU_CHAR_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAXsAAAGQ
   const goalStatsEl = document.getElementById('goalStats');
   const retryBtnEl = document.getElementById('retryBtn');
   const backToStartBtnEl = document.getElementById('backToStartBtn');
+  const tcLeanBackEl = document.getElementById('tcLeanBack');
+  const tcLeanFwdEl = document.getElementById('tcLeanFwd');
+  const tcHintEl = document.getElementById('tcHint');
 
   // ---------- Responsive scale (reused pattern from tetris_ninniku.html) ----------
   const popupMode = new URLSearchParams(location.search).get('popup') === '1';
@@ -227,6 +240,12 @@ const NINNIKU_CHAR_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAXsAAAGQ
   const STREAK_BONUS_PER = 0.05; // 連続で着地に成功するたびに+5%ずつ加速が乗る
   const STREAK_CAP = 8;          // 最大+40%まで(それ以上は頭打ち)
 
+  // マリオ64風の3段ジャンプ: 着地してすぐ(CHAIN_WINDOW_MS以内に)再ジャンプすると
+  // 段数が上がってジャンプが高くなり、3段目でめっちゃ加速する。段数はそこでリセット。
+  const CHAIN_WINDOW_MS = 300;
+  const JUMP_IMPULSE_LV = [1, 1.3, 1.7];
+  const TRIPLE_JUMP_SPEED_BOOST = 1.6;
+
   // ---------- Intro (マリオ風の土管から登場する演出) ----------
   const PIPE_X = 60;
   const PIPE_W = 46;
@@ -251,6 +270,8 @@ const NINNIKU_CHAR_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAXsAAAGQ
       airborne: false,
       legPhase: 0,
       jumpStreak: 0,
+      jumpChain: 0,
+      chainTimer: 0,
     };
     camX = 0;
     elapsed = 0;
@@ -366,15 +387,32 @@ const NINNIKU_CHAR_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAXsAAAGQ
     if(heldActions.has('jump')){
       player.speed = Math.min(MAX_SPEED, player.speed * 1.08);
     }
+
+    // すぐに再ジャンプすれば3段ジャンプに繋げられる猶予時間をセット
+    player.chainTimer = CHAIN_WINDOW_MS;
   }
 
   function tryJump(){
     if(state !== 'play' || player.airborne) return;
     const info = groundInfoAt(player.x);
     const angle = info ? info.angle : 0;
+
+    if(player.jumpChain > 0 && player.chainTimer > 0){
+      player.jumpChain = Math.min(3, player.jumpChain + 1);
+    } else {
+      player.jumpChain = 1;
+    }
+
+    const impulseMul = JUMP_IMPULSE_LV[player.jumpChain - 1];
     player.airborne = true;
     player.vx = player.speed * Math.cos(angle);
-    player.vy = player.speed * Math.sin(angle) - JUMP_IMPULSE;
+    player.vy = player.speed * Math.sin(angle) - JUMP_IMPULSE * impulseMul;
+
+    if(player.jumpChain >= 3){
+      player.speed = Math.min(MAX_SPEED, player.speed * TRIPLE_JUMP_SPEED_BOOST);
+      comboPopup = { text: '3段ジャンプ!!!', timer: 1100, maxTimer: 1100, big: true };
+      player.jumpChain = 0; // マリオ64と同じく、3段の後は最初からやり直し
+    }
   }
 
   function checkObstacleHit(){
@@ -421,6 +459,11 @@ const NINNIKU_CHAR_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAXsAAAGQ
         player.speed += (CRUISE_SPEED - player.speed) * SPEED_RECOVERY * dt;
         player.x += player.speed * dt;
         player.legPhase = (player.legPhase + player.speed * dt * 0.05) % (Math.PI * 2);
+
+        if(player.chainTimer > 0){
+          player.chainTimer -= dt * 1000;
+          if(player.chainTimer <= 0) player.jumpChain = 0; // 猶予切れで3段ジャンプの連鎖が途切れる
+        }
       }
     }
 
@@ -625,15 +668,16 @@ const NINNIKU_CHAR_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAXsAAAGQ
   function drawComboPopup(){
     if(!comboPopup || comboPopup.timer <= 0) return;
     const t = Math.max(0, comboPopup.timer / comboPopup.maxTimer);
+    const big = !!comboPopup.big;
     const sx = player.x - camX;
-    const sy = player.y - 68 - (1 - t) * 18;
+    const sy = player.y - (big ? 76 : 68) - (1 - t) * (big ? 28 : 18);
     ctx.save();
     ctx.globalAlpha = Math.min(1, t * 2);
-    ctx.font = 'bold 18px "Yu Gothic", Meiryo, sans-serif';
+    ctx.font = 'bold ' + (big ? 26 : 18) + 'px "Yu Gothic", Meiryo, sans-serif';
     ctx.textAlign = 'center';
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = '#5b3a1e';
-    ctx.fillStyle = '#F3980D';
+    ctx.lineWidth = big ? 4 : 3;
+    ctx.strokeStyle = big ? '#8a1f0a' : '#5b3a1e';
+    ctx.fillStyle = big ? '#FFD23F' : '#F3980D';
     ctx.strokeText(comboPopup.text, sx, sy);
     ctx.fillText(comboPopup.text, sx, sy);
     ctx.restore();
@@ -656,6 +700,27 @@ const NINNIKU_CHAR_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAXsAAAGQ
   retryBtnEl.addEventListener('click', startGame);
   backToStartBtnEl.addEventListener('click', backToStart);
   document.getElementById('resumeBtn').addEventListener('click', togglePause);
+
+  // ---------- タッチ操作(スマホ向け) ----------
+  const isTouchDevice = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+  if(isTouchDevice){
+    tcLeanBackEl.classList.add('show');
+    tcLeanFwdEl.classList.add('show');
+    tcHintEl.classList.add('show');
+  }
+  function bindHoldButton(el, action){
+    const press = (e) => { e.preventDefault(); heldActions.add(action); };
+    const release = (e) => { if(e) e.preventDefault(); heldActions.delete(action); };
+    el.addEventListener('touchstart', press, { passive: false });
+    el.addEventListener('touchend', release);
+    el.addEventListener('touchcancel', release);
+  }
+  bindHoldButton(tcLeanBackEl, 'leanBack');
+  bindHoldButton(tcLeanFwdEl, 'leanForward');
+  canvas.addEventListener('touchstart', (e) => {
+    e.preventDefault();
+    tryJump();
+  }, { passive: false });
 
   resetPlayer();
   distTotalEl.textContent = Math.round(GOAL_X / 10);
