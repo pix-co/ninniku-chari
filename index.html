@@ -202,7 +202,6 @@ const NINNIKU_CHAR_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAXsAAAGQ
   const PIT_FALL_Y = 640;        // falling past this = missed the jump, into the pit
   const LANDING_PERFECT_DEG = 10;
   const LANDING_OK_DEG = 30;
-  const LANDING_CRASH_DEG = 55;
 
   // ---------- Game state ----------
   let state = 'start'; // 'start' | 'play' | 'paused' | 'crash' | 'goal'
@@ -273,12 +272,9 @@ const NINNIKU_CHAR_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAXsAAAGQ
       player.speed = Math.min(MAX_SPEED, landedSpeed * 1.15);
     } else if(diffDeg <= LANDING_OK_DEG){
       player.speed = landedSpeed * 0.9;
-    } else if(diffDeg <= LANDING_CRASH_DEG){
-      player.speed = landedSpeed * 0.55;
-      triggerCrash(0.3);
     } else {
-      player.speed = landedSpeed * 0.55;
-      triggerCrash(0.8);
+      // 着地が乱れても失速するだけ。クラッシュ演出(ダメージ)は出さない
+      player.speed = landedSpeed * 0.65;
     }
   }
 
