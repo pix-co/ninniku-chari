@@ -157,58 +157,42 @@ const NINNIKU_CHAR_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAXsAAAGQ
     if(action){ heldActions.delete(action); }
   });
 
-  // ---------- Terrain (ランダム生成) ----------
+  // ---------- Terrain (固定コース、500m) ----------
   // Points define a ground polyline. gapAfter:true means there is NO ground
   // between this point and the next (a pit/ramp gap the player must jump).
+  // 各ジャンプ台は dx=250,dy=-30 の登り坂で統一(巡航速度300px/s・ジャンプ初速420px/s
+  // だと安全に180px前後まで届く実測値)、穴の幅は余裕を見て140pxに統一。
   const GROUND_BASE = 400;
   const COURSE_LENGTH = 5000; // 500m (距離表示は x/10 メートル)
   const GOAL_X = COURSE_LENGTH;
-  let terrain = [];
-  let OBSTACLES = [];
-
-  // 巡航速度300px/s・ジャンプ初速420px/sの条件で、上り気味のジャンプ台なら
-  // 180px前後まで安全に飛び越えられる。余裕を見て穴の幅は120〜150pxに収める。
-  function generateTerrain(){
-    const SAFE_START = 500;  // スタート直後は平坦(操作に慣れる区間)
-    const SAFE_END = 450;    // ゴール直前も平坦にする
-    const newTerrain = [{ x: 0, y: GROUND_BASE }];
-    const newObstacles = [];
-    let x = 0, y = GROUND_BASE;
-    let stepsSinceGap = 99;
-
-    while(x < COURSE_LENGTH - SAFE_END){
-      const step = 260 + Math.random() * 180; // 260〜440px間隔で地形の起伏を作る
-      const nextX = Math.min(x + step, COURSE_LENGTH - SAFE_END);
-      const canGap = x > SAFE_START && stepsSinceGap > 1 && nextX < COURSE_LENGTH - SAFE_END - 200;
-      const makeGap = canGap && Math.random() < 0.22;
-
-      if(makeGap){
-        // ジャンプ台は必ず「登り」にして、飛距離が不足しないようにする
-        const rampY = Math.max(GROUND_BASE - 160, y - 50 - Math.random() * 40);
-        newTerrain.push({ x: nextX, y: rampY, gapAfter: true });
-        const gapWidth = 120 + Math.random() * 30; // 120〜150px
-        const landX = nextX + gapWidth;
-        const landY = Math.max(GROUND_BASE - 140, Math.min(GROUND_BASE + 90, rampY + 20 + Math.random() * 30));
-        newTerrain.push({ x: landX, y: landY });
-        x = landX; y = landY;
-        stepsSinceGap = 0;
-      } else {
-        let nextY = y + (Math.random() * 140 - 70);
-        nextY = Math.max(GROUND_BASE - 160, Math.min(GROUND_BASE + 100, nextY));
-        newTerrain.push({ x: nextX, y: nextY });
-        // 平坦区間の途中にたまに障害物を置く(穴の直後は避ける)
-        if(x > SAFE_START && stepsSinceGap > 2 && Math.random() < 0.28){
-          const obX = Math.round(x + step * (0.3 + Math.random() * 0.4));
-          newObstacles.push({ x: obX, w: 22 + Math.round(Math.random() * 12), h: 20 + Math.round(Math.random() * 10) });
-        }
-        x = nextX; y = nextY;
-        stepsSinceGap++;
-      }
-    }
-    newTerrain.push({ x: COURSE_LENGTH - SAFE_END, y: GROUND_BASE });
-    newTerrain.push({ x: COURSE_LENGTH, y: GROUND_BASE }); // goal
-    return { terrain: newTerrain, obstacles: newObstacles };
-  }
+  const terrain = [
+    { x: 0,    y: GROUND_BASE },
+    { x: 500,  y: GROUND_BASE },       // 平坦なスタート区間
+    { x: 800,  y: GROUND_BASE + 60 },
+    { x: 1100, y: GROUND_BASE - 10 },
+    { x: 1350, y: GROUND_BASE - 40, gapAfter: true }, // ジャンプ台1
+    { x: 1490, y: GROUND_BASE - 10 },
+    { x: 1800, y: GROUND_BASE + 10 },
+    { x: 2100, y: GROUND_BASE - 60 },
+    { x: 2400, y: GROUND_BASE + 10 },
+    { x: 2650, y: GROUND_BASE - 20 },
+    { x: 2900, y: GROUND_BASE - 50, gapAfter: true }, // ジャンプ台2
+    { x: 3040, y: GROUND_BASE - 20 },
+    { x: 3350, y: GROUND_BASE + 40 },
+    { x: 3650, y: GROUND_BASE + 10 },
+    { x: 3900, y: GROUND_BASE - 20, gapAfter: true }, // ジャンプ台3
+    { x: 4040, y: GROUND_BASE + 10 },
+    { x: 4350, y: GROUND_BASE },
+    { x: 4550, y: GROUND_BASE },       // 平坦なゴール前区間
+    { x: 5000, y: GROUND_BASE },       // goal
+  ];
+  const OBSTACLES = [
+    { x: 650,  w: 26, h: 24 },
+    { x: 1950, w: 28, h: 24 },
+    { x: 2500, w: 24, h: 22 },
+    { x: 3500, w: 30, h: 26 },
+    { x: 4200, w: 24, h: 22 },
+  ];
 
   function findSegment(x){
     for(let i = 0; i < terrain.length - 1; i++){
@@ -267,7 +251,6 @@ const NINNIKU_CHAR_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAXsAAAGQ
   }
 
   function startGame(){
-    ({ terrain, obstacles: OBSTACLES } = generateTerrain());
     resetPlayer();
     player.y = GROUND_BASE + INTRO_RISE; // 地面の下(土管の中)からスタート
     state = 'intro';
@@ -613,7 +596,6 @@ const NINNIKU_CHAR_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAXsAAAGQ
   backToStartBtnEl.addEventListener('click', backToStart);
   document.getElementById('resumeBtn').addEventListener('click', togglePause);
 
-  ({ terrain, obstacles: OBSTACLES } = generateTerrain());
   resetPlayer();
   distTotalEl.textContent = Math.round(GOAL_X / 10);
   fitToWindow();
