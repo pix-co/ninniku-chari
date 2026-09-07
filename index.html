@@ -12,8 +12,8 @@
   canvas{ display:block; width:960px; height:540px; background:#8fd0f2; border-radius:10px; box-shadow:0 8px 30px rgba(0,0,0,.5); }
   #hud{ position:absolute; top:10px; left:10px; right:10px; display:flex; justify-content:space-between; pointer-events:none; color:#fff; text-shadow:0 1px 3px rgba(0,0,0,.6); font-size:15px; font-weight:bold; }
   #hud .box{ background:rgba(0,0,0,.35); padding:6px 12px; border-radius:8px; }
-  #mascotImg{ position:absolute; top:6px; left:14px; width:64px; height:auto; filter:drop-shadow(0 2px 4px rgba(0,0,0,.4)); }
-  #bubble{ position:absolute; top:12px; left:86px; background:#fff; border:2px solid #C8481A; border-radius:14px; padding:6px 14px; font-size:13px; font-weight:bold; color:#4a2c0f; white-space:nowrap; }
+  #mascotImg{ position:absolute; top:6px; left:400px; width:52px; height:auto; filter:drop-shadow(0 2px 4px rgba(0,0,0,.4)); }
+  #bubble{ position:absolute; top:12px; left:458px; background:#fff; border:2px solid #C8481A; border-radius:14px; padding:6px 14px; font-size:13px; font-weight:bold; color:#4a2c0f; white-space:nowrap; }
   .overlay{ position:absolute; inset:0; background:rgba(10,20,30,.72); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; color:#fff; text-align:center; }
   .overlay.hidden{ display:none; }
   .overlay h1{ margin:0; font-size:34px; color:#F3980D; text-shadow:0 2px 4px rgba(0,0,0,.5); }
@@ -256,7 +256,7 @@ const NINNIKU_CHAR_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAXsAAAGQ
 
   function resetPlayer(){
     player = {
-      x: 0, y: GROUND_BASE, angle: 0,
+      x: PIPE_X, y: GROUND_BASE, angle: 0, // 土管の位置から出てくるので、開始xを土管に合わせる
       speed: CRUISE_SPEED, // scalar forward speed while grounded
       vx: 0, vy: 0,        // used only while airborne
       airborne: false,
