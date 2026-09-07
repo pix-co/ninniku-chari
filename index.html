@@ -224,6 +224,8 @@ const NINNIKU_CHAR_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAXsAAAGQ
   const PIT_FALL_Y = 640;        // falling past this = missed the jump, into the pit
   const LANDING_PERFECT_DEG = 10;
   const LANDING_OK_DEG = 30;
+  const STREAK_BONUS_PER = 0.05; // 連続で着地に成功するたびに+5%ずつ加速が乗る
+  const STREAK_CAP = 8;          // 最大+40%まで(それ以上は頭打ち)
 
   // ---------- Intro (マリオ風の土管から登場する演出) ----------
   const PIPE_X = 60;
@@ -239,6 +241,7 @@ const NINNIKU_CHAR_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAXsAAAGQ
   let state = 'start'; // 'start' | 'intro' | 'play' | 'paused' | 'goal' | 'gameover'
   let player, camX, elapsed, lastTime, introTimer, introPhase;
   let resultFocusIndex = 0; // 0 = もう一度, 1 = スタートに戻る (goal/gameover画面での選択)
+  let comboPopup = null; // { text, timer, maxTimer } — 連続ジャンプ成功時に浮かぶ表示
 
   function resetPlayer(){
     player = {
@@ -247,9 +250,11 @@ const NINNIKU_CHAR_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAXsAAAGQ
       vx: 0, vy: 0,        // used only while airborne
       airborne: false,
       legPhase: 0,
+      jumpStreak: 0,
     };
     camX = 0;
     elapsed = 0;
+    comboPopup = null;
   }
 
   function startGame(){
@@ -340,11 +345,21 @@ const NINNIKU_CHAR_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAXsAAAGQ
     if(diffDeg <= LANDING_PERFECT_DEG){
       // perfect landing: speed boost
       player.speed = Math.min(MAX_SPEED, landedSpeed * 1.15);
+      player.jumpStreak++;
     } else if(diffDeg <= LANDING_OK_DEG){
       player.speed = landedSpeed * 0.9;
+      player.jumpStreak++;
     } else {
       // 着地が乱れても失速するだけ。クラッシュ演出(ダメージ)は出さない
       player.speed = landedSpeed * 0.65;
+      player.jumpStreak = 0; // 着地が乱れるとコンボは途切れる
+    }
+
+    // 連続でジャンプの着地に成功するほど、加速にさらに加速が乗っていく
+    if(player.jumpStreak >= 2){
+      const bonus = 1 + Math.min(player.jumpStreak, STREAK_CAP) * STREAK_BONUS_PER;
+      player.speed = Math.min(MAX_SPEED, player.speed * bonus);
+      comboPopup = { text: 'コンボ ×' + player.jumpStreak + '!', timer: 900, maxTimer: 900 };
     }
 
     // 着地と同時にジャンプ入力があれば、タイミングを讃えて少し加速する
@@ -384,6 +399,11 @@ const NINNIKU_CHAR_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAXsAAAGQ
     elapsed += dt;
     const leanFwd = heldActions.has('leanForward');
     const leanBack = heldActions.has('leanBack');
+
+    if(comboPopup){
+      comboPopup.timer -= dt * 1000;
+      if(comboPopup.timer <= 0) comboPopup = null;
+    }
 
     if(!player.airborne){
       const info = groundInfoAt(player.x);
@@ -598,6 +618,25 @@ const NINNIKU_CHAR_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAXsAAAGQ
     } else {
       drawPlayer();
     }
+
+    drawComboPopup();
+  }
+
+  function drawComboPopup(){
+    if(!comboPopup || comboPopup.timer <= 0) return;
+    const t = Math.max(0, comboPopup.timer / comboPopup.maxTimer);
+    const sx = player.x - camX;
+    const sy = player.y - 68 - (1 - t) * 18;
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, t * 2);
+    ctx.font = 'bold 18px "Yu Gothic", Meiryo, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = '#5b3a1e';
+    ctx.fillStyle = '#F3980D';
+    ctx.strokeText(comboPopup.text, sx, sy);
+    ctx.fillText(comboPopup.text, sx, sy);
+    ctx.restore();
   }
 
   // ---------- Main loop ----------
