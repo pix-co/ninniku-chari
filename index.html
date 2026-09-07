@@ -229,13 +229,15 @@ const NINNIKU_CHAR_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAXsAAAGQ
   const PIPE_X = 60;
   const PIPE_W = 46;
   const PIPE_RIM_H = 10;
-  const PIPE_TOP = GROUND_BASE - 14; // 地面から少しだけ突き出た土管のフチ
-  const INTRO_RISE = 42;             // スタート時、地面の下からこの高さぶん浮上する
-  const INTRO_DURATION = 700;        // ms
+  const PIPE_HEIGHT = 34;             // 地面から突き出ている土管の高さ
+  const PIPE_TOP = GROUND_BASE - PIPE_HEIGHT;
+  const INTRO_HIDDEN_DROP = 50;       // 土管の中(フチより下)の隠れた開始位置
+  const INTRO_RISE_MS = 550;          // 第1段階: 土管のフチまでせり上がる
+  const INTRO_STEP_MS = 250;          // 第2段階: 地面まで降りる
 
   // ---------- Game state ----------
   let state = 'start'; // 'start' | 'intro' | 'play' | 'paused' | 'goal' | 'gameover'
-  let player, camX, elapsed, lastTime, introTimer;
+  let player, camX, elapsed, lastTime, introTimer, introPhase;
   let resultFocusIndex = 0; // 0 = もう一度, 1 = スタートに戻る (goal/gameover画面での選択)
 
   function resetPlayer(){
@@ -252,9 +254,10 @@ const NINNIKU_CHAR_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAXsAAAGQ
 
   function startGame(){
     resetPlayer();
-    player.y = GROUND_BASE + INTRO_RISE; // 地面の下(土管の中)からスタート
+    player.y = PIPE_TOP + INTRO_HIDDEN_DROP; // 土管の中、フチより下の見えない位置からスタート
     state = 'intro';
-    introTimer = INTRO_DURATION;
+    introPhase = 'rise';
+    introTimer = INTRO_RISE_MS;
     startOverlayEl.classList.add('hidden');
     goalOverlayEl.classList.add('hidden');
     pauseOverlayEl.classList.add('hidden');
@@ -263,13 +266,27 @@ const NINNIKU_CHAR_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAXsAAAGQ
 
   function updateIntro(dt){
     introTimer -= dt * 1000;
-    const progress = Math.min(1, 1 - Math.max(0, introTimer) / INTRO_DURATION);
-    const eased = 1 - Math.pow(1 - progress, 2); // ease-out
-    player.y = GROUND_BASE + INTRO_RISE * (1 - eased);
-    player.legPhase += dt * 4;
-    if(introTimer <= 0){
-      player.y = GROUND_BASE;
-      state = 'play';
+    if(introPhase === 'rise'){
+      // 土管のフチまでせり上がる(この間はフチより下をクリップして隠す)
+      const progress = Math.min(1, 1 - Math.max(0, introTimer) / INTRO_RISE_MS);
+      const eased = 1 - Math.pow(1 - progress, 2); // ease-out
+      player.y = (PIPE_TOP + INTRO_HIDDEN_DROP) - INTRO_HIDDEN_DROP * eased;
+      player.legPhase += dt * 3;
+      if(introTimer <= 0){
+        player.y = PIPE_TOP;
+        introPhase = 'step';
+        introTimer = INTRO_STEP_MS;
+      }
+    } else {
+      // 土管の上から地面まで降りる(もうクリップは不要)
+      const progress = Math.min(1, 1 - Math.max(0, introTimer) / INTRO_STEP_MS);
+      const eased = progress * progress; // ease-in
+      player.y = PIPE_TOP + (GROUND_BASE - PIPE_TOP) * eased;
+      player.legPhase += dt * 6;
+      if(introTimer <= 0){
+        player.y = GROUND_BASE;
+        state = 'play';
+      }
     }
   }
 
@@ -570,11 +587,11 @@ const NINNIKU_CHAR_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAXsAAAGQ
     drawObstacles();
     drawPipe();
 
-    if(state === 'intro'){
-      // 土管の中から出てくる途中は、地面より下の部分をクリップして隠す
+    if(state === 'intro' && introPhase === 'rise'){
+      // 土管のフチまでせり上がる途中は、フチより下の部分をクリップして隠す
       ctx.save();
       ctx.beginPath();
-      ctx.rect(0, 0, 960, GROUND_BASE);
+      ctx.rect(0, 0, 960, PIPE_TOP);
       ctx.clip();
       drawPlayer();
       ctx.restore();
