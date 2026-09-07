@@ -32,9 +32,16 @@
   .btn:active{ transform:translateY(3px); box-shadow:0 1px 0 #a5650a; }
   .btn.secondary{ background:#fff; color:#C8481A; box-shadow:0 4px 0 #cbb9a0; }
   .btn-row{ display:flex; gap:12px; }
+  .overlay-card{ display:flex; flex-direction:column; align-items:stretch; gap:10px; width:300px; }
+  .overlay-card h1{ text-align:center; }
+  .overlay-card p{ text-align:center; }
+  .overlay-mascot{ width:110px; height:auto; align-self:center; filter:drop-shadow(0 3px 5px rgba(0,0,0,.4)); }
+  .btn.wide{ width:100%; box-sizing:border-box; }
+  .hidden{ display:none !important; }
+  #scoreSubmit{ display:flex; flex-direction:column; gap:10px; }
   .gameover-selected{ background:#F3980D !important; color:#fff !important; box-shadow:0 4px 0 #a5650a !important; }
   .gameover-unselected{ background:#fff !important; color:#C8481A !important; box-shadow:0 4px 0 #cbb9a0 !important; }
-  #nameInput{ width:220px; padding:9px 12px; border-radius:8px; border:2px solid #C8481A; font-size:15px; text-align:center; margin-bottom:10px; }
+  #nameInput{ width:100%; box-sizing:border-box; padding:9px 12px; border-radius:8px; border:2px solid #C8481A; font-size:15px; text-align:center; }
   #rankResultText{ margin:8px 0 0; font-size:14px; color:#FFD23F; font-weight:bold; }
   #rankingEntries{ list-style:none; margin:0; padding:0; width:420px; max-height:340px; overflow-y:auto; background:rgba(0,0,0,.25); border-radius:10px; }
   #rankingEntries li{ display:flex; align-items:center; gap:10px; padding:7px 14px; font-size:14px; border-bottom:1px solid rgba(255,255,255,.12); }
@@ -77,19 +84,18 @@
   </div>
 
   <div id="goalOverlay" class="overlay hidden">
-    <h1 id="goalTitle">ゴール!</h1>
-    <p id="goalStats"></p>
-    <div id="scoreSubmit" class="hidden">
-      <input id="nameInput" type="text" maxlength="12" placeholder="なまえ(12文字まで)">
-      <div class="btn-row">
-        <button class="btn" id="submitScoreBtn">ランキングに登録</button>
-        <button class="btn secondary" id="shareScoreBtn">Xでシェア</button>
+    <div class="overlay-card">
+      <img class="overlay-mascot" id="overlayMascotImg" alt="ニンニクマン">
+      <h1 id="goalTitle">ゴール!</h1>
+      <p id="goalStats"></p>
+      <div id="scoreSubmit" class="hidden">
+        <p id="rankResultText" class="hidden"></p>
+        <input id="nameInput" type="text" maxlength="12" placeholder="なまえ(12文字まで)">
+        <button class="btn wide" id="submitScoreBtn">ランキングに登録</button>
+        <button class="btn secondary wide" id="shareScoreBtn">Xでシェア</button>
       </div>
-      <p id="rankResultText" class="hidden"></p>
-    </div>
-    <div class="btn-row">
-      <button class="btn" id="retryBtn">もう一度</button>
-      <button class="btn secondary" id="backToStartBtn">スタートに戻る</button>
+      <button class="btn secondary wide" id="retryBtn">もう一度</button>
+      <button class="btn secondary wide" id="backToStartBtn">スタートに戻る</button>
     </div>
   </div>
 
@@ -163,6 +169,8 @@ const JUMP_VOICE_3_SRC = "data:audio/wav;base64,UklGRg7OAABXQVZFZm10IBIAAAABAAEA
   const tcLeanBackEl = document.getElementById('tcLeanBack');
   const tcLeanFwdEl = document.getElementById('tcLeanFwd');
   const tcHintEl = document.getElementById('tcHint');
+  const overlayMascotImgEl = document.getElementById('overlayMascotImg');
+  overlayMascotImgEl.src = NINNIKU_CHAR_SRC;
   const rankingBtnEl = document.getElementById('rankingBtn');
   const rankingOverlayEl = document.getElementById('rankingOverlay');
   const rankingEntriesEl = document.getElementById('rankingEntries');
@@ -673,10 +681,12 @@ const JUMP_VOICE_3_SRC = "data:audio/wav;base64,UklGRg7OAABXQVZFZm10IBIAAAABAAEA
     submitScoreBtnEl.disabled = false;
     shareScoreBtnEl.textContent = 'Xでシェア';
     scoreSubmitEl.classList.remove('hidden');
+    retryBtnEl.classList.add('secondary'); // 登録ボタンが主役なので、もう一度は控えめに
   }
   function hideScoreSubmit(){
     pendingSubmit = null;
     scoreSubmitEl.classList.add('hidden');
+    retryBtnEl.classList.remove('secondary');
   }
 
   submitScoreBtnEl.addEventListener('click', async () => {
