@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>ニンニクマンチャリ走(開発中)</title>
+<title>走れニンニクマン(開発中)</title>
 <style>
   :root{ color-scheme: dark; }
   html,body{ margin:0; padding:0; background:#1b2a3a; height:100%; overflow:hidden; }
@@ -20,6 +20,10 @@
   .overlay p{ margin:0; font-size:16px; }
   .btn{ background:#F3980D; color:#3a1f00; border:none; border-radius:10px; padding:12px 30px; font-size:17px; font-weight:bold; cursor:pointer; box-shadow:0 4px 0 #a5650a; }
   .btn:active{ transform:translateY(3px); box-shadow:0 1px 0 #a5650a; }
+  .btn.secondary{ background:#fff; color:#C8481A; box-shadow:0 4px 0 #cbb9a0; }
+  .btn-row{ display:flex; gap:12px; }
+  .gameover-selected{ background:#F3980D !important; color:#fff !important; box-shadow:0 4px 0 #a5650a !important; }
+  .gameover-unselected{ background:#fff !important; color:#C8481A !important; box-shadow:0 4px 0 #cbb9a0 !important; }
   #progressWrap{ position:absolute; bottom:10px; left:10px; right:10px; height:10px; background:rgba(0,0,0,.35); border-radius:6px; overflow:hidden; }
   #progressBar{ height:100%; width:0%; background:linear-gradient(90deg,#F3980D,#C8481A); }
   #crashFlash{ position:absolute; inset:0; background:#ff0000; opacity:0; pointer-events:none; }
@@ -38,15 +42,18 @@
   <div id="crashFlash"></div>
 
   <div id="startOverlay" class="overlay">
-    <h1>ニンニクマンチャリ走</h1>
-    <p>一定速度で自動的に走ります。加速・ブレーキ操作は不要!<br>Space: ジャンプ(穴や障害物は自分でジャンプして避けよう)<br>↑↓: 空中での姿勢制御(着地角度で失速・爆速が変わる)</p>
+    <h1>走れニンニクマン</h1>
+    <p>一定速度で自動的に走ります。加速・ブレーキ操作は不要!<br>Space: ジャンプ(穴や障害物にぶつかるとゲームオーバー!)<br>↑↓: 空中での姿勢制御(着地角度で失速・爆速が変わる)</p>
     <button class="btn" id="startBtn">スタート [Enter]</button>
   </div>
 
   <div id="goalOverlay" class="overlay hidden">
     <h1 id="goalTitle">ゴール!</h1>
     <p id="goalStats"></p>
-    <button class="btn" id="retryBtn">もう一度 [Enter]</button>
+    <div class="btn-row">
+      <button class="btn" id="retryBtn">もう一度</button>
+      <button class="btn secondary" id="backToStartBtn">スタートに戻る</button>
+    </div>
   </div>
 
   <div id="pauseOverlay" class="overlay hidden">
@@ -78,6 +85,8 @@ const NINNIKU_CHAR_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAXsAAAGQ
   const pauseOverlayEl = document.getElementById('pauseOverlay');
   const goalTitleEl = document.getElementById('goalTitle');
   const goalStatsEl = document.getElementById('goalStats');
+  const retryBtnEl = document.getElementById('retryBtn');
+  const backToStartBtnEl = document.getElementById('backToStartBtn');
 
   // ---------- Responsive scale (reused pattern from tetris_ninniku.html) ----------
   const popupMode = new URLSearchParams(location.search).get('popup') === '1';
@@ -132,9 +141,15 @@ const NINNIKU_CHAR_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAXsAAAGQ
     if(action === 'pause'){ togglePause(); }
     if(action === 'jump' && !e.repeat){ tryJump(); }
     if(e.code === 'Escape' && state !== 'start'){ backToStart(); }
+    if(!goalOverlayEl.classList.contains('hidden')){
+      if(e.code === 'ArrowLeft' || e.code === 'ArrowUp'){ resultFocusIndex = 0; updateResultFocus(); }
+      if(e.code === 'ArrowRight' || e.code === 'ArrowDown'){ resultFocusIndex = 1; updateResultFocus(); }
+    }
     if(e.code === 'Enter' || e.code === 'Space'){
       if(!startOverlayEl.classList.contains('hidden')){ startGame(); }
-      else if(!goalOverlayEl.classList.contains('hidden')){ startGame(); }
+      else if(!goalOverlayEl.classList.contains('hidden')){
+        (resultFocusIndex === 0 ? retryBtnEl : backToStartBtnEl).click();
+      }
     }
   });
   window.addEventListener('keyup', (e) => {
@@ -190,12 +205,11 @@ const NINNIKU_CHAR_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAXsAAAGQ
   }
 
   // ---------- Physics constants ----------
-  // チャリ走は一定速度で自動的に走り続けるゲームなので、加速・ブレーキ操作は無い。
+  // 走れニンニクマンは一定速度で自動的に走り続けるゲームなので、加速・ブレーキ操作は無い。
   // プレイヤーが操作するのはジャンプのタイミングと、空中での姿勢(着地角度)のみ。
   const GRAVITY = 1500;          // px/s^2
   const CRUISE_SPEED = 300;      // px/s — 常にこの速度で走り続ける(操作不要)
   const SPEED_RECOVERY = 2.2;    // ジャンプ後の速度が巡航速度へ戻る速さ
-  const CRASH_FRICTION = 220;    // px/s^2 — クラッシュでよろけている間だけ減速
   const AIR_ROT_SPEED = 2.6;     // rad/s bike rotation control while airborne
   const MAX_SPEED = 900;         // px/s
   const JUMP_IMPULSE = 420;      // upward kick from a manual jump (px/s)
@@ -204,8 +218,9 @@ const NINNIKU_CHAR_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAXsAAAGQ
   const LANDING_OK_DEG = 30;
 
   // ---------- Game state ----------
-  let state = 'start'; // 'start' | 'play' | 'paused' | 'crash' | 'goal'
-  let player, camX, elapsed, lastTime, crashTimer;
+  let state = 'start'; // 'start' | 'play' | 'paused' | 'goal' | 'gameover'
+  let player, camX, elapsed, lastTime;
+  let resultFocusIndex = 0; // 0 = もう一度, 1 = スタートに戻る (goal/gameover画面での選択)
 
   function resetPlayer(){
     player = {
@@ -213,12 +228,10 @@ const NINNIKU_CHAR_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAXsAAAGQ
       speed: CRUISE_SPEED, // scalar forward speed while grounded
       vx: 0, vy: 0,        // used only while airborne
       airborne: false,
-      wobble: 0,
       legPhase: 0,
     };
     camX = 0;
     elapsed = 0;
-    crashTimer = 0;
   }
 
   function startGame(){
@@ -242,13 +255,23 @@ const NINNIKU_CHAR_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAXsAAAGQ
     startOverlayEl.classList.remove('hidden');
   }
 
-  function triggerCrash(severity){
-    // severity 0..1, higher = worse crash
-    state = 'crash';
-    crashTimer = 500 + severity * 700;
-    player.speed *= (1 - severity * 0.8);
+  function updateResultFocus(){
+    const focusables = [retryBtnEl, backToStartBtnEl];
+    focusables.forEach((btn, i) => {
+      btn.classList.toggle('gameover-selected', i === resultFocusIndex);
+      btn.classList.toggle('gameover-unselected', i !== resultFocusIndex);
+    });
+  }
+
+  function gameOver(reason){
+    state = 'gameover';
+    goalTitleEl.textContent = 'ゲームオーバー';
+    goalStatsEl.textContent = reason;
+    resultFocusIndex = 0;
+    updateResultFocus();
+    goalOverlayEl.classList.remove('hidden');
     crashFlashEl.style.transition = 'none';
-    crashFlashEl.style.opacity = String(0.15 + severity * 0.35);
+    crashFlashEl.style.opacity = '0.5';
     requestAnimationFrame(() => {
       crashFlashEl.style.transition = 'opacity .4s';
       crashFlashEl.style.opacity = '0';
@@ -294,7 +317,7 @@ const NINNIKU_CHAR_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAXsAAAGQ
       const groundY = info ? info.y : GROUND_BASE;
       const clearance = groundY - player.y; // how high above local ground the player currently is
       if(clearance < ob.h){
-        triggerCrash(0.55);
+        gameOver('障害物にぶつかってしまった…');
         return true;
       }
     }
@@ -302,24 +325,7 @@ const NINNIKU_CHAR_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAXsAAAGQ
   }
 
   function fallIntoPit(){
-    state = 'crash';
-    crashTimer = 900;
-    let i = findSegment(player.x);
-    while(i > 0 && terrain[i-1].gapAfter) i--;
-    const respawnX = Math.max(0, terrain[i].x - 30);
-    const info = groundInfoAt(respawnX);
-    player.x = respawnX;
-    player.y = info ? info.y : GROUND_BASE;
-    player.angle = info ? info.angle : 0;
-    player.airborne = false;
-    player.vx = 0; player.vy = 0;
-    player.speed = Math.max(40, player.speed * 0.3);
-    crashFlashEl.style.transition = 'none';
-    crashFlashEl.style.opacity = '0.5';
-    requestAnimationFrame(() => {
-      crashFlashEl.style.transition = 'opacity .4s';
-      crashFlashEl.style.opacity = '0';
-    });
+    gameOver('穴に落ちてしまった…');
   }
 
   function updatePlay(dt){
@@ -375,30 +381,12 @@ const NINNIKU_CHAR_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAXsAAAGQ
     progressBarEl.style.width = Math.min(100, (player.x / GOAL_X) * 100) + '%';
   }
 
-  function updateCrash(dt){
-    crashTimer -= dt * 1000;
-    player.wobble += dt * 20;
-    if(!player.airborne){
-      const info = groundInfoAt(player.x);
-      if(info) { player.y = info.y; player.angle = info.angle + Math.sin(player.wobble) * 0.15; }
-      player.x += player.speed * dt;
-      player.speed = Math.max(0, player.speed - CRASH_FRICTION * dt);
-    } else {
-      player.vy += GRAVITY * dt;
-      player.x += player.vx * dt;
-      player.y += player.vy * dt;
-      player.angle += 6 * dt;
-      const info = groundInfoAt(player.x);
-      if(info !== null && player.y >= info.y){ player.airborne = false; player.y = info.y; }
-    }
-    camX = Math.max(0, player.x - 260);
-    if(crashTimer <= 0){ state = 'play'; }
-  }
-
   function finishGoal(){
     state = 'goal';
     goalTitleEl.textContent = 'ゴール!';
     goalStatsEl.textContent = 'タイム: ' + elapsed.toFixed(2) + ' 秒';
+    resultFocusIndex = 0;
+    updateResultFocus();
     goalOverlayEl.classList.remove('hidden');
   }
 
@@ -475,16 +463,16 @@ const NINNIKU_CHAR_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAXsAAAGQ
   }
 
   function drawLegs(phase){
-    const hip = { x: 3, y: -3 };
-    const crank = { x: -2, y: 9 };
-    const r = 7;
+    // 走るモーション: 腰を支点に脚を前後交互に振り、前に振る半分だけ少し持ち上げる
+    const hip = { x: 0, y: -14 };
+    const stride = 7, lift = 6;
     ctx.strokeStyle = '#e8dcc0';
     ctx.lineWidth = 5;
     ctx.lineCap = 'round';
     for(let i = 0; i < 2; i++){
       const p = phase + i * Math.PI;
-      const fx = crank.x + Math.cos(p) * r;
-      const fy = crank.y + Math.sin(p) * r * 0.6;
+      const fx = Math.cos(p) * stride;
+      const fy = -Math.max(0, Math.sin(p)) * lift;
       ctx.beginPath();
       ctx.moveTo(hip.x, hip.y);
       ctx.lineTo(fx, fy);
@@ -498,34 +486,23 @@ const NINNIKU_CHAR_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAXsAAAGQ
     const sx = player.x - camX;
     const sy = player.y;
     ctx.save();
-    ctx.translate(sx, sy - 14);
+    ctx.translate(sx, sy);
     ctx.rotate(player.angle);
-    // bike body
-    ctx.strokeStyle = '#222';
-    ctx.lineWidth = 4;
-    ctx.beginPath();
-    ctx.moveTo(-16, 10); ctx.lineTo(4, -6); ctx.lineTo(16, 10);
-    ctx.moveTo(4, -6); ctx.lineTo(-2, 10);
-    ctx.stroke();
-    ctx.fillStyle = '#333';
-    ctx.beginPath(); ctx.arc(-16, 12, 10, 0, Math.PI*2); ctx.fill();
-    ctx.beginPath(); ctx.arc(16, 12, 10, 0, Math.PI*2); ctx.fill();
 
-    // ペダルを漕ぐ脚(画像の脚部分はクロップし、代わりにここで円運動させる)
     drawLegs(player.legPhase);
 
     // ニンニクマン本体(頭〜腰。脚は上のdrawLegsで表現するため画像下部はクロップ)
     if(charImg.complete && charImg.naturalWidth){
       const cw = 32, srcW = 379, srcH = 300; // 300/400 = 元画像の脚を除いた上半身部分
       const ch = cw * (srcH / srcW);
-      const hipY = -3;
-      ctx.drawImage(charImg, 0, 0, srcW, srcH, -cw/2 + 2, hipY - ch, cw, ch);
+      const hipY = -14;
+      ctx.drawImage(charImg, 0, 0, srcW, srcH, -cw/2, hipY - ch, cw, ch);
     } else {
       ctx.fillStyle = '#F5E7C6';
       ctx.strokeStyle = '#C8481A';
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.ellipse(4, -22, 11, 13, 0, 0, Math.PI*2);
+      ctx.ellipse(0, -33, 11, 13, 0, 0, Math.PI*2);
       ctx.fill(); ctx.stroke();
     }
     ctx.restore();
@@ -552,14 +529,14 @@ const NINNIKU_CHAR_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAXsAAAGQ
     lastTime = now;
 
     if(state === 'play') updatePlay(dt);
-    else if(state === 'crash') updateCrash(dt);
 
     draw();
     requestAnimationFrame(loop);
   }
 
   document.getElementById('startBtn').addEventListener('click', startGame);
-  document.getElementById('retryBtn').addEventListener('click', startGame);
+  retryBtnEl.addEventListener('click', startGame);
+  backToStartBtnEl.addEventListener('click', backToStart);
   document.getElementById('resumeBtn').addEventListener('click', togglePause);
 
   resetPlayer();
