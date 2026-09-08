@@ -3,38 +3,43 @@
 // .github/workflows/ranking.yml action can validate it and update
 // ranking-clear.json exactly as before (same pattern as tetris-ninniku).
 //
-// Anti-cheat: a run must first fetch a one-time start token from POST
-// /start (issued at the moment the player presses Start). The token is a
-// random id stored server-side in a KV namespace, keyed by the token and
-// holding the issue timestamp. Submitting a score:
-//   1. requires the token to exist in KV (i.e. it was really issued, and
-//      not already used) - this makes every token single-use, closing the
-//      "capture one request in DevTools and resend it forever" replay hole
-//   2. is rejected unless the claimed clear time is no faster than the
-//      real wall-clock time that has actually elapsed since the token was
-//      issued (with a small tolerance for timer/network imprecision) -
-//      this closes the "POST an arbitrary value without ever playing" hole
-// The token is deleted from KV the moment it's consumed (valid or not,
-// once looked up it can never be reused), so a captured request can only
-// ever register once, no matter how many times it's resent.
+// Anti-cheat: a run must first fetch a signed start token from POST /start
+// (issued at the moment the player presses Start), then include that token
+// when submitting the score/time. The submission is rejected unless the
+// claimed clear time is no faster than the real wall-clock time that has
+// actually elapsed since the token was issued (with a small tolerance for
+// timer/network imprecision). This blocks forging a result by POSTing an
+// arbitrary value straight from DevTools without ever playing.
+//
+// This version does NOT use Workers KV (no server-side token storage) -
+// tokens are self-contained and verified purely via HMAC signature, so
+// there's no per-request KV write and therefore no KV write-quota outage
+// risk. The trade-off vs. the KV-backed version: a captured
+// token+value pair can be replayed (resent as-is) to register the same
+// score again, since there's no server-side "already used" bookkeeping.
+// If that becomes a problem again, the KV-backed design (single-use
+// tokens) is the fix, but requires enough KV write quota (Workers Paid
+// plan) to handle one write per game start.
 //
 // Deploy this as-is in the Cloudflare dashboard (Workers & Pages ->
-// select this Worker -> paste this file), then:
-//   1. Add an encrypted environment variable GITHUB_TOKEN: a fine-grained
-//      GitHub personal access token scoped ONLY to this repo
-//      (pix-co/running-ninniku) with "Issues: Read and write" permission.
-//   2. Create a KV namespace (Workers & Pages -> KV -> Create namespace,
-//      any name e.g. "running-ninniku-ranking-tokens") and bind it to
-//      this Worker under Settings -> Variables -> KV Namespace Bindings,
-//      with the binding name RANKING_TOKENS (must match exactly).
-// The previous RANKING_SIGNING_KEY secret is no longer used and can be
-// removed (harmless to leave it too).
+// select this Worker -> paste this file), then add TWO encrypted
+// environment variables (Settings -> Variables):
+//   - GITHUB_TOKEN: a fine-grained GitHub personal access token scoped
+//     ONLY to this repo (pix-co/running-ninniku) with "Issues: Read and
+//     write" permission (no other scopes needed).
+//   - RANKING_SIGNING_KEY: any long random secret string (e.g. 32+ random
+//     characters), type "Secret". Only this Worker needs to know it; it
+//     is never sent to the client. Used to HMAC-sign start tokens so they
+//     can't be forged. (If this secret is still set from before, it can
+//     be reused as-is - no need to change it.)
+// The RANKING_TOKENS KV binding is no longer used by this version and can
+// be left in place (harmless) or removed from the Worker's bindings.
 
 const REPO_OWNER = 'pix-co';
 const REPO_NAME = 'running-ninniku';
 const ALLOWED_ORIGIN = 'https://pix-co.github.io';
 
-const TOKEN_MAX_AGE_SEC = 30 * 60;             // 一時停止等の余裕を見て30分まで有効
+const TOKEN_MAX_AGE_MS = 30 * 60 * 1000;       // 一時停止等の余裕を見て30分まで有効
 const CLOCK_TOLERANCE_MS = 1500;               // タイマー精度・通信遅延の許容誤差
 const MIN_CLEAR_MS = 3000;                     // 理論上の最速(約5.6秒)より十分短い絶対下限
 
@@ -53,6 +58,54 @@ function jsonResponse(body, status){
   });
 }
 
+async function getHmacKey(env){
+  const keyData = new TextEncoder().encode(env.RANKING_SIGNING_KEY || '');
+  return crypto.subtle.importKey('raw', keyData, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign', 'verify']);
+}
+
+function bufToHex(buf){
+  return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+function hexToBuf(hex){
+  if(typeof hex !== 'string' || hex.length === 0 || hex.length % 2 !== 0) return null;
+  const arr = new Uint8Array(hex.length / 2);
+  for(let i = 0; i < arr.length; i++){
+    const byte = parseInt(hex.substr(i * 2, 2), 16);
+    if(Number.isNaN(byte)) return null;
+    arr[i] = byte;
+  }
+  return arr;
+}
+
+async function issueToken(env){
+  const key = await getHmacKey(env);
+  const payload = btoa(JSON.stringify({ ts: Date.now() }));
+  const sigBuf = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(payload));
+  return payload + '.' + bufToHex(sigBuf);
+}
+
+// Returns the token's issue timestamp (ms) if the signature is valid and
+// well-formed, or null otherwise.
+async function verifyToken(token, env){
+  if(typeof token !== 'string') return null;
+  const dot = token.indexOf('.');
+  if(dot < 0) return null;
+  const payload = token.slice(0, dot);
+  const sigHex = token.slice(dot + 1);
+  const sigBytes = hexToBuf(sigHex);
+  if(!sigBytes) return null;
+  const key = await getHmacKey(env);
+  const valid = await crypto.subtle.verify('HMAC', key, sigBytes, new TextEncoder().encode(payload));
+  if(!valid) return null;
+  try{
+    const ts = JSON.parse(atob(payload)).ts;
+    return Number.isFinite(ts) ? ts : null;
+  }catch(e){
+    return null;
+  }
+}
+
 export default {
   async fetch(request, env){
     if(request.method === 'OPTIONS'){
@@ -64,8 +117,7 @@ export default {
 
     const url = new URL(request.url);
     if(url.pathname === '/start'){
-      const token = crypto.randomUUID();
-      await env.RANKING_TOKENS.put(token, String(Date.now()), { expirationTtl: TOKEN_MAX_AGE_SEC });
+      const token = await issueToken(env);
       return jsonResponse({ ok:true, token });
     }
 
@@ -88,18 +140,13 @@ export default {
       return jsonResponse({ ok:false, error:'invalid submission' }, 400);
     }
 
-    const token = typeof data.token === 'string' ? data.token : '';
-    const issuedAtStr = token ? await env.RANKING_TOKENS.get(token) : null;
-    if(issuedAtStr === null){
-      // 未発行・期限切れ(KVのTTLで自動失効)・もしくは既に一度使用済みのトークン
-      return jsonResponse({ ok:false, error:'missing, expired, or already-used start token' }, 400);
+    const tokenTs = await verifyToken(data.token, env);
+    if(tokenTs === null){
+      return jsonResponse({ ok:false, error:'missing or invalid start token' }, 400);
     }
-    // 一度読んだトークンはここで即座に無効化する(検証結果に関わらず、以後の再送は必ず失敗する)
-    await env.RANKING_TOKENS.delete(token);
-
-    const tokenAge = Date.now() - Number(issuedAtStr);
-    if(!Number.isFinite(tokenAge) || tokenAge < 0){
-      return jsonResponse({ ok:false, error:'invalid start token' }, 400);
+    const tokenAge = Date.now() - tokenTs;
+    if(tokenAge < 0 || tokenAge > TOKEN_MAX_AGE_MS){
+      return jsonResponse({ ok:false, error:'start token expired' }, 400);
     }
     if(value > tokenAge + CLOCK_TOLERANCE_MS){
       return jsonResponse({ ok:false, error:'claimed time exceeds elapsed real time' }, 400);
