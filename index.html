@@ -81,6 +81,7 @@
     <p>一定速度で自動的に走ります。加速・ブレーキ操作は不要!<br>Space(スマホはタップ): ジャンプ(穴や障害物にぶつかるとゲームオーバー!)<br>↑↓: 空中での姿勢制御(着地角度で失速・爆速が変わる)</p>
     <button class="btn" id="startBtn">スタート [Enter]</button>
     <button class="btn secondary" id="rankingBtn">ランキング</button>
+    <button class="btn secondary" id="popupBtn">ポップアップで開く</button>
   </div>
 
   <div id="goalOverlay" class="overlay hidden">
@@ -741,8 +742,8 @@ const JUMP_VOICE_3_SRC = "data:audio/wav;base64,UklGRg7OAABXQVZFZm10IBIAAAABAAEA
 
   // ---------- Rendering ----------
   function drawGround(){
-    ctx.fillStyle = '#5b3a1e';
-    ctx.strokeStyle = '#3f2a15';
+    ctx.fillStyle = '#4a9c52';
+    ctx.strokeStyle = '#2f6e35';
     ctx.lineWidth = 4;
     let drawing = false;
     ctx.beginPath();
@@ -789,6 +790,113 @@ const JUMP_VOICE_3_SRC = "data:audio/wav;base64,UklGRg7OAABXQVZFZm10IBIAAAABAAEA
     ctx.lineTo(gx + 34, GROUND_BASE - 76);
     ctx.lineTo(gx + 2, GROUND_BASE - 62);
     ctx.closePath();
+    ctx.fill();
+
+    // 庭園っぽい小さな花を等間隔に飾る(穴の上には咲かせない)
+    const FLOWER_COLORS = ['#fff5c0', '#ffd6e8', '#ffffff'];
+    const FLOWER_SPACING = 70;
+    const viewStart = Math.floor(camX / FLOWER_SPACING) * FLOWER_SPACING;
+    for(let fx = viewStart; fx < camX + 980; fx += FLOWER_SPACING){
+      const info = groundInfoAt(fx);
+      if(!info) continue;
+      const sx2 = fx - camX;
+      const fy = info.y - 3;
+      const colorIdx = Math.abs(Math.round(fx / FLOWER_SPACING)) % FLOWER_COLORS.length;
+      ctx.fillStyle = '#3f8a45';
+      ctx.fillRect(sx2 - 1, fy - 6, 2, 6);
+      ctx.fillStyle = FLOWER_COLORS[colorIdx];
+      for(let k = 0; k < 4; k++){
+        const ang = (Math.PI / 2) * k;
+        ctx.beginPath();
+        ctx.arc(sx2 + Math.cos(ang) * 3, fy - 6 + Math.sin(ang) * 3, 2.4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.fillStyle = '#F3980D';
+      ctx.beginPath();
+      ctx.arc(sx2, fy - 6, 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  function drawCastleBackdrop(){
+    // マリオ64のピーチ城の庭っぽい遠景(オリジナル画で再現。実際の画像素材は使用していない)
+    const parallaxSky = 0.1, parallaxHill = 0.25, parallaxCastle = 0.35;
+
+    // 空の雲
+    ctx.fillStyle = 'rgba(255,255,255,.85)';
+    const cloudBaseX = -((camX * parallaxSky) % 300);
+    for(let i = -1; i < 5; i++){
+      const cx = cloudBaseX + i * 300;
+      const cy = 70 + (i % 2) * 30;
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, 34, 16, 0, 0, Math.PI * 2);
+      ctx.ellipse(cx + 26, cy + 4, 24, 13, 0, 0, Math.PI * 2);
+      ctx.ellipse(cx - 26, cy + 6, 22, 12, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // 遠くの丘
+    const hillBaseX = -((camX * parallaxHill) % 480);
+    ctx.fillStyle = '#8fd18a';
+    for(let i = -1; i < 4; i++){
+      const hx = hillBaseX + i * 480;
+      ctx.beginPath();
+      ctx.moveTo(hx - 40, GROUND_BASE);
+      ctx.quadraticCurveTo(hx + 140, GROUND_BASE - 130, hx + 320, GROUND_BASE);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    // ピーチ城っぽい城のシルエット(1回だけ、コース序盤の背景に固定)
+    const castleWorldX = 260;
+    const cx = castleWorldX * (1 - parallaxCastle) + (castleWorldX - camX) * parallaxCastle;
+    const baseY = GROUND_BASE - 40;
+    ctx.fillStyle = '#e9dfc7';
+    ctx.strokeStyle = '#b7a67e';
+    ctx.lineWidth = 2;
+    // 本館
+    ctx.fillRect(cx - 55, baseY - 90, 110, 90);
+    ctx.strokeRect(cx - 55, baseY - 90, 110, 90);
+    // 左右の塔
+    [-78, 56].forEach((dx) => {
+      ctx.fillRect(cx + dx, baseY - 120, 22, 120);
+      ctx.strokeRect(cx + dx, baseY - 120, 22, 120);
+      ctx.fillStyle = '#C8481A';
+      ctx.beginPath();
+      ctx.moveTo(cx + dx - 4, baseY - 120);
+      ctx.lineTo(cx + dx + 11, baseY - 150);
+      ctx.lineTo(cx + dx + 26, baseY - 120);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = '#e9dfc7';
+    });
+    // 中央の塔
+    ctx.fillRect(cx - 16, baseY - 160, 32, 160);
+    ctx.strokeRect(cx - 16, baseY - 160, 32, 160);
+    ctx.fillStyle = '#C8481A';
+    ctx.beginPath();
+    ctx.moveTo(cx - 20, baseY - 160);
+    ctx.lineTo(cx, baseY - 195);
+    ctx.lineTo(cx + 20, baseY - 160);
+    ctx.closePath();
+    ctx.fill();
+    // 旗
+    ctx.strokeStyle = '#8a7a55';
+    ctx.beginPath();
+    ctx.moveTo(cx, baseY - 195);
+    ctx.lineTo(cx, baseY - 212);
+    ctx.stroke();
+    ctx.fillStyle = '#F3980D';
+    ctx.beginPath();
+    ctx.moveTo(cx, baseY - 212);
+    ctx.lineTo(cx + 16, baseY - 206);
+    ctx.lineTo(cx, baseY - 200);
+    ctx.closePath();
+    ctx.fill();
+    // 円窓
+    ctx.fillStyle = '#7fb9e0';
+    ctx.beginPath();
+    ctx.arc(cx, baseY - 110, 10, 0, Math.PI * 2);
     ctx.fill();
   }
 
@@ -880,6 +988,7 @@ const JUMP_VOICE_3_SRC = "data:audio/wav;base64,UklGRg7OAABXQVZFZm10IBIAAAABAAEA
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, 960, 540);
 
+    drawCastleBackdrop();
     drawGround();
     drawObstacles();
     drawPipe();
@@ -934,6 +1043,18 @@ const JUMP_VOICE_3_SRC = "data:audio/wav;base64,UklGRg7OAABXQVZFZm10IBIAAAABAAEA
   retryBtnEl.addEventListener('click', startGame);
   backToStartBtnEl.addEventListener('click', backToStart);
   document.getElementById('resumeBtn').addEventListener('click', togglePause);
+  document.getElementById('popupBtn').addEventListener('click', () => {
+    const w = 1000, h = 620;
+    const left = Math.round((window.screen.width - w) / 2);
+    const top = Math.round((window.screen.height - h) / 2);
+    const popupUrl = location.origin + location.pathname + '?popup=1';
+    window.open(
+      popupUrl,
+      'running-ninniku-popup',
+      'width=' + w + ',height=' + h + ',left=' + left + ',top=' + top +
+        ',menubar=no,toolbar=no,location=no,status=no,resizable=yes,scrollbars=no'
+    );
+  });
 
   // ---------- タッチ操作(スマホ向け) ----------
   const isTouchDevice = !!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
