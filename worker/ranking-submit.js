@@ -6,11 +6,11 @@
 // Deploy this as-is in the Cloudflare dashboard (Workers & Pages ->
 // Create -> paste this file), then add an encrypted environment
 // variable named GITHUB_TOKEN holding a fine-grained GitHub personal
-// access token scoped ONLY to this repo (pix-co/ninniku-chari) with
+// access token scoped ONLY to this repo (pix-co/running-ninniku) with
 // "Issues: Read and write" permission (no other scopes needed).
 
 const REPO_OWNER = 'pix-co';
-const REPO_NAME = 'ninniku-chari';
+const REPO_NAME = 'running-ninniku';
 const ALLOWED_ORIGIN = 'https://pix-co.github.io';
 
 function corsHeaders(){
