@@ -482,6 +482,9 @@ const JUMP_VOICE_3_SRC = "data:audio/wav;base64,UklGRg7OAABXQVZFZm10IBIAAAABAAEA
     // 着地と同時にジャンプ入力があれば、タイミングを讃えて少し加速する
     if(heldActions.has('jump')){
       player.speed = Math.min(MAX_SPEED, player.speed * 1.08);
+    } else {
+      // 最速フレームで再ジャンプできなかった場合は、マリオ64と同じく足元に砂煙
+      spawnDustPuff(player.x, player.y);
     }
 
     // すぐに再ジャンプすれば3段ジャンプに繋げられる猶予時間をセット
@@ -567,10 +570,7 @@ const JUMP_VOICE_3_SRC = "data:audio/wav;base64,UklGRg7OAABXQVZFZm10IBIAAAABAAEA
 
         if(player.chainTimer > 0){
           player.chainTimer -= dt * 1000;
-          if(player.chainTimer <= 0){
-            player.jumpChain = 0; // 猶予切れで3段ジャンプの連鎖が途切れる
-            spawnDustPuff(player.x, player.y); // マリオ64と同じく、最速で跳べなかった時だけ足元に砂煙
-          }
+          if(player.chainTimer <= 0) player.jumpChain = 0; // 猶予切れで3段ジャンプの連鎖が途切れる
         }
       }
     }
@@ -1056,17 +1056,17 @@ const JUMP_VOICE_3_SRC = "data:audio/wav;base64,UklGRg7OAABXQVZFZm10IBIAAAABAAEA
   }
 
   function spawnDustPuff(worldX, groundY){
-    for(let i = 0; i < 5; i++){
-      const ang = Math.PI + (Math.random() - 0.5) * Math.PI * 0.8; // 主に上向きに広がる
-      const speed = 16 + Math.random() * 22;
+    for(let i = 0; i < 9; i++){
+      const ang = Math.PI + (Math.random() - 0.5) * Math.PI * 0.9; // 主に上向きに広がる
+      const speed = 24 + Math.random() * 34;
       dustPuffs.push({
-        x: worldX + (Math.random() - 0.5) * 10,
+        x: worldX + (Math.random() - 0.5) * 14,
         y: groundY - 2,
         vx: Math.cos(ang) * speed,
         vy: Math.sin(ang) * speed,
-        life: 380 + Math.random() * 140,
-        maxLife: 500,
-        r: 3 + Math.random() * 3,
+        life: 420 + Math.random() * 160,
+        maxLife: 580,
+        r: 5 + Math.random() * 4,
       });
     }
   }
@@ -1076,11 +1076,14 @@ const JUMP_VOICE_3_SRC = "data:audio/wav;base64,UklGRg7OAABXQVZFZm10IBIAAAABAAEA
       const t = Math.max(0, d.life / d.maxLife);
       const sx = d.x - camX;
       ctx.save();
-      ctx.globalAlpha = t * 0.55;
-      ctx.fillStyle = '#e8e2d0';
+      ctx.globalAlpha = Math.min(1, t * 1.3) * 0.9;
+      ctx.fillStyle = '#f5f1e4';
+      ctx.strokeStyle = 'rgba(150,138,110,.55)';
+      ctx.lineWidth = 1.5;
       ctx.beginPath();
-      ctx.arc(sx, d.y, d.r * (1.6 - t * 0.6), 0, Math.PI * 2);
+      ctx.arc(sx, d.y, d.r * (2 - t * 0.7), 0, Math.PI * 2);
       ctx.fill();
+      ctx.stroke();
       ctx.restore();
     }
   }
