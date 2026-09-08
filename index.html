@@ -4,111 +4,198 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>走れニンニクマン(開発中)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;500;700;900&display=swap" rel="stylesheet">
 <style>
-  :root{ color-scheme: dark; }
-  html,body{ margin:0; padding:0; background:#1b2a3a; height:100%; overflow:hidden; }
-  body{ display:flex; align-items:center; justify-content:center; font-family:'Yu Gothic',Meiryo,sans-serif; }
-  #wrap{ position:relative; width:960px; height:540px; transform-origin: center center; }
-  canvas{ display:block; width:960px; height:540px; background:#8fd0f2; border-radius:10px; box-shadow:0 8px 30px rgba(0,0,0,.5); touch-action:none; }
-  .touchBtn{ position:absolute; width:74px; height:74px; border-radius:50%; background:rgba(255,255,255,.28); border:3px solid rgba(255,255,255,.65); color:#fff; font-size:26px; font-weight:bold; display:none; align-items:center; justify-content:center; user-select:none; -webkit-user-select:none; touch-action:none; }
-  .touchBtn.show{ display:flex; }
-  .touchBtn:active{ background:rgba(255,255,255,.5); }
-  #tcLeanBack{ left:22px; bottom:112px; }
-  #tcLeanFwd{ left:22px; bottom:22px; }
-  #tcHint{ position:absolute; bottom:26px; right:22px; color:#fff; font-size:13px; font-weight:bold; text-shadow:0 1px 3px rgba(0,0,0,.6); display:none; }
-  #tcHint.show{ display:block; }
-  #soundToggleBtn{ position:absolute; top:6px; left:700px; width:36px; height:36px; border-radius:50%; background:rgba(0,0,0,.35); border:2px solid rgba(255,255,255,.5); color:#fff; font-size:17px; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0; }
-  #versionLabel{ position:absolute; bottom:44px; right:14px; color:rgba(255,255,255,.55); font-size:11px; font-weight:bold; text-shadow:0 1px 2px rgba(0,0,0,.5); pointer-events:none; }
-  #hud{ position:absolute; top:10px; left:10px; right:10px; display:flex; justify-content:space-between; pointer-events:none; color:#fff; text-shadow:0 1px 3px rgba(0,0,0,.6); font-size:15px; font-weight:bold; }
+  :root{
+    --cream:#FBF3E7;
+    --panel:#FFFFFF;
+    --ink:#4A3B2D;
+    --outline:#8C7C6E;
+    --outline-dark:#5B4C3E;
+    --golden:#F3980D;
+    --terracotta:#C8481A;
+    --ivory:#FBEFD9;
+    --taupe:#B7A499;
+    --shadow: rgba(74,59,45,0.18);
+  }
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0; padding:0; height:100%;
+    background:var(--cream);
+    font-family:'Zen Maru Gothic', sans-serif;
+    color:var(--ink);
+    -webkit-tap-highlight-color: transparent;
+    overflow:hidden;
+    overscroll-behavior:none;
+  }
+  body{
+    background-image:
+      radial-gradient(circle at 8% 12%, rgba(243,152,13,0.10) 0, transparent 40%),
+      radial-gradient(circle at 92% 85%, rgba(200,72,26,0.08) 0, transparent 45%);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    height:100vh;
+    height:100dvh;
+  }
+  #wrap{
+    width: max-content;
+    flex-shrink: 0;
+    margin: 0 auto;
+    padding: 18px 14px calc(24px + env(safe-area-inset-bottom));
+    transform-origin: center center;
+  }
+  header{ display:flex; align-items:center; gap:14px; justify-content:center; margin-bottom:14px; }
+  html.popup-mode header{ display:none; }
+  header img{ width:52px; height:auto; filter: drop-shadow(0 3px 0 var(--shadow)); }
+  h1{
+    font-size: clamp(22px, 4vw, 30px);
+    font-weight:900;
+    margin:0;
+    letter-spacing: 0.02em;
+    color: var(--terracotta);
+    text-shadow: 2px 2px 0 var(--ivory), -1px -1px 0 var(--ivory), 1px -1px 0 var(--ivory), -1px 1px 0 var(--ivory);
+  }
+  .board-shell{
+    background: var(--panel);
+    border: 4px solid var(--outline-dark);
+    border-radius: 18px;
+    padding: 10px;
+    box-shadow: 0 8px 0 var(--shadow);
+    touch-action: none;
+  }
+  .canvas-area{ position:relative; }
+  canvas{ display:block; width:960px; height:540px; background:#8fd0f2; border-radius:10px; touch-action:none; }
+  #buttonPanel{ margin-top:10px; }
+  #hud{ position:absolute; top:20px; left:20px; right:20px; display:flex; justify-content:space-between; pointer-events:none; color:#fff; text-shadow:0 1px 3px rgba(0,0,0,.6); font-size:15px; font-weight:bold; }
   #hud .box{ background:rgba(0,0,0,.35); padding:6px 12px; border-radius:8px; }
-  #timeHud{ position:absolute; top:44px; right:10px; color:#fff; text-shadow:0 1px 3px rgba(0,0,0,.6); font-size:15px; font-weight:bold; pointer-events:none; }
-  #mascotImg{ position:absolute; top:6px; left:400px; width:52px; height:auto; filter:drop-shadow(0 2px 4px rgba(0,0,0,.4)); }
-  #bubble{ position:absolute; top:12px; left:458px; background:#fff; border:2px solid #C8481A; border-radius:14px; padding:6px 14px; font-size:13px; font-weight:bold; color:#4a2c0f; white-space:nowrap; }
-  .overlay{ position:absolute; inset:0; background:rgba(10,20,30,.72); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; color:#fff; text-align:center; }
+  #timeHud{ position:absolute; top:54px; right:20px; color:#fff; text-shadow:0 1px 3px rgba(0,0,0,.6); font-size:15px; font-weight:bold; pointer-events:none; }
+  button{ font-family:'Zen Maru Gothic', sans-serif; cursor:pointer; }
+  .btn{
+    background: var(--golden);
+    border: 3px solid var(--outline-dark);
+    color: #fff;
+    font-weight: 700;
+    border-radius: 12px;
+    padding: 10px 12px;
+    font-size: 14px;
+    box-shadow: 0 4px 0 var(--outline-dark);
+    transition: transform 0.05s ease;
+    width:100%;
+  }
+  .btn:active{ transform: translateY(3px); box-shadow: 0 1px 0 var(--outline-dark); }
+  .btn.secondary{ background: var(--panel); color: var(--terracotta); }
+  .btn-row{ display:flex; gap:8px; }
+  .touchBtn{ position:absolute; width:64px; height:64px; border-radius:50%; background:var(--panel); border:3px solid var(--outline-dark); color:var(--terracotta); font-size:24px; font-weight:900; display:none; align-items:center; justify-content:center; user-select:none; -webkit-user-select:none; touch-action:none; box-shadow: 0 4px 0 var(--outline-dark); }
+  .touchBtn.show{ display:flex; }
+  .touchBtn:active{ transform:translateY(3px); box-shadow:0 1px 0 var(--outline-dark); }
+  #tcLeanBack{ left:16px; bottom:96px; }
+  #tcLeanFwd{ left:16px; bottom:16px; }
+  #tcHint{ position:absolute; bottom:20px; right:16px; color:#4a2c0f; background:rgba(255,255,255,.85); border-radius:8px; padding:4px 10px; font-size:12px; font-weight:bold; display:none; }
+  #tcHint.show{ display:block; }
+  #soundToggleBtn{ position:absolute; top:16px; left:710px; width:34px; height:34px; border-radius:50%; background:var(--panel); border:2px solid var(--outline-dark); color:var(--terracotta); font-size:16px; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0; }
+  #versionLabel{ position:absolute; bottom:14px; right:14px; color:rgba(255,255,255,.7); font-size:11px; font-weight:bold; text-shadow:0 1px 2px rgba(0,0,0,.5); pointer-events:none; }
+  .overlay{ position:absolute; inset:0; background: rgba(251,243,231,0.92); border-radius:10px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; text-align:center; padding:16px; z-index:5; }
   .overlay.hidden{ display:none; }
-  .overlay h1{ margin:0; font-size:34px; color:#F3980D; text-shadow:0 2px 4px rgba(0,0,0,.5); }
-  .overlay p{ margin:0; font-size:16px; }
-  .btn{ background:#F3980D; color:#3a1f00; border:none; border-radius:10px; padding:12px 30px; font-size:17px; font-weight:bold; cursor:pointer; box-shadow:0 4px 0 #a5650a; }
-  .btn:active{ transform:translateY(3px); box-shadow:0 1px 0 #a5650a; }
-  .btn.secondary{ background:#fff; color:#C8481A; box-shadow:0 4px 0 #cbb9a0; }
-  .btn-row{ display:flex; gap:12px; }
   .overlay-card{ display:flex; flex-direction:column; align-items:stretch; gap:10px; width:300px; }
-  .overlay-card h1{ text-align:center; }
-  .overlay-card p{ text-align:center; }
-  .overlay-mascot{ width:110px; height:auto; align-self:center; filter:drop-shadow(0 3px 5px rgba(0,0,0,.4)); }
+  .overlay-card h1{ margin:0; font-size:20px; color: var(--terracotta); font-weight:900; text-align:center; text-shadow:none; }
+  .overlay-card p{ margin:0; font-size:13px; font-weight:500; color: var(--ink); text-align:center; }
+  .overlay-mascot{ width:90px; height:auto; align-self:center; filter: drop-shadow(0 4px 0 var(--shadow)); }
   .btn.wide{ width:100%; box-sizing:border-box; }
   .hidden{ display:none !important; }
   #scoreSubmit{ display:flex; flex-direction:column; gap:10px; }
-  .gameover-selected{ background:#F3980D !important; color:#fff !important; box-shadow:0 4px 0 #a5650a !important; }
-  .gameover-unselected{ background:#fff !important; color:#C8481A !important; box-shadow:0 4px 0 #cbb9a0 !important; }
-  #nameInput{ width:100%; box-sizing:border-box; padding:9px 12px; border-radius:8px; border:2px solid #C8481A; font-size:15px; text-align:center; }
-  #rankResultText{ margin:8px 0 0; font-size:14px; color:#FFD23F; font-weight:bold; }
-  #rankingEntries{ list-style:none; margin:0; padding:0; width:420px; max-height:340px; overflow-y:auto; background:rgba(0,0,0,.25); border-radius:10px; }
-  #rankingEntries li{ display:flex; align-items:center; gap:10px; padding:7px 14px; font-size:14px; border-bottom:1px solid rgba(255,255,255,.12); }
+  .gameover-selected{ background: var(--golden) !important; color:#fff !important; box-shadow: 0 4px 0 var(--outline-dark) !important; }
+  .gameover-unselected{ background: var(--panel) !important; color: var(--terracotta) !important; box-shadow: 0 4px 0 var(--outline-dark) !important; }
+  #nameInput{ font-family:'Zen Maru Gothic', sans-serif; width:100%; box-sizing:border-box; padding:9px 12px; border-radius:10px; border:3px solid var(--outline-dark); font-size:14px; text-align:center; color: var(--ink); }
+  #rankResultText{ margin:0; font-size:14px; color: var(--terracotta); font-weight:900; }
+  #rankingEntries{ list-style:none; margin:0; padding:0; width:100%; max-height:340px; overflow-y:auto; text-align:left; }
+  #rankingEntries li{ display:flex; align-items:center; gap:8px; padding:7px 4px; font-size:13px; border-bottom:1px solid rgba(140,124,110,0.25); }
+  #rankingEntries li:nth-child(even){ background: rgba(243,152,13,0.06); }
   #rankingEntries li:last-child{ border-bottom:none; }
-  .rank-no{ width:52px; font-weight:bold; color:#cfd8e3; flex-shrink:0; }
-  .rank-gold{ color:#FFD23F; }
-  .rank-silver{ color:#D6D9DD; }
-  .rank-bronze{ color:#D9915B; }
-  .rank-name{ flex:1; text-align:left; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .rank-val{ font-weight:bold; color:#F3980D; flex-shrink:0; }
-  .rank-empty{ text-align:center; color:#cfd8e3; padding:16px; justify-content:center; }
-  #progressWrap{ position:absolute; bottom:10px; left:10px; right:10px; height:10px; background:rgba(0,0,0,.35); border-radius:6px; overflow:hidden; }
-  #progressBar{ height:100%; width:0%; background:linear-gradient(90deg,#F3980D,#C8481A); }
-  #crashFlash{ position:absolute; inset:0; background:#ff0000; opacity:0; pointer-events:none; }
+  .rank-no{ width:2.2em; font-weight:900; color: var(--terracotta); flex-shrink:0; text-align:center; }
+  .rank-gold{ color:#C8481A; }
+  .rank-silver{ color:#8C7C6E; }
+  .rank-bronze{ color:#B7792F; }
+  .rank-name{ flex:1; text-align:left; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:700; color: var(--ink); }
+  .rank-val{ font-weight:900; color: var(--terracotta); flex-shrink:0; font-variant-numeric: tabular-nums; }
+  .rank-empty{ text-align:center; color: var(--taupe); padding:14px 0; }
+  #progressWrap{ position:absolute; bottom:8px; left:8px; right:8px; height:8px; background:rgba(0,0,0,.2); border-radius:6px; overflow:hidden; }
+  #progressBar{ height:100%; width:0%; background:linear-gradient(90deg,var(--golden),var(--terracotta)); }
+  #crashFlash{ position:absolute; inset:0; background:#ff0000; opacity:0; pointer-events:none; border-radius:10px; }
 </style>
 </head>
 <body>
 <div id="wrap">
-  <canvas id="game" width="960" height="540"></canvas>
-  <div id="hud">
-    <div class="box">速度: <span id="speedVal">0</span> km/h</div>
-    <div class="box">距離: <span id="distVal">0</span> / <span id="distTotal">0</span> m</div>
-  </div>
-  <div id="timeHud" class="box">タイム: <span id="timeVal">0.00</span> 秒</div>
-  <img id="mascotImg" alt="ニンニクマン">
-  <div id="bubble">がんばって〜!</div>
-  <div id="progressWrap"><div id="progressBar"></div></div>
-  <div id="crashFlash"></div>
-  <button class="touchBtn" id="tcLeanBack" type="button">↑</button>
-  <button class="touchBtn" id="tcLeanFwd" type="button">↓</button>
-  <div id="tcHint">タップでジャンプ</div>
-  <button id="soundToggleBtn" type="button" title="効果音のON/OFF">🔊</button>
-  <div id="versionLabel">v0.1.0</div>
-
-  <div id="startOverlay" class="overlay">
+  <header>
+    <img id="headerMascotImg" alt="ニンニクマン">
     <h1>走れニンニクマン</h1>
-    <p>一定速度で自動的に走ります。加速・ブレーキ操作は不要!<br>Space(スマホはタップ): ジャンプ(穴や障害物にぶつかるとゲームオーバー!)<br>↑↓: 空中での姿勢制御(着地角度で失速・爆速が変わる)</p>
-    <button class="btn" id="startBtn">スタート [Enter]</button>
-    <button class="btn secondary" id="rankingBtn">ランキング</button>
-    <button class="btn secondary" id="popupBtn">ポップアップで開く</button>
-  </div>
+  </header>
 
-  <div id="goalOverlay" class="overlay hidden">
-    <div class="overlay-card">
-      <img class="overlay-mascot" id="overlayMascotImg" alt="ニンニクマン">
-      <h1 id="goalTitle">ゴール!</h1>
-      <p id="goalStats"></p>
-      <div id="scoreSubmit" class="hidden">
-        <p id="rankResultText" class="hidden"></p>
-        <input id="nameInput" type="text" maxlength="12" placeholder="なまえ(12文字まで)">
-        <button class="btn wide" id="submitScoreBtn">ランキングに登録</button>
-        <button class="btn secondary wide" id="shareScoreBtn">Xでシェア</button>
+  <div class="board-shell">
+    <div class="canvas-area">
+      <canvas id="game" width="960" height="540"></canvas>
+      <div id="hud">
+        <div class="box">速度: <span id="speedVal">0</span> km/h</div>
+        <div class="box">距離: <span id="distVal">0</span> / <span id="distTotal">0</span> m</div>
       </div>
-      <button class="btn secondary wide" id="retryBtn">もう一度</button>
-      <button class="btn secondary wide" id="backToStartBtn">スタートに戻る</button>
+      <div id="timeHud" class="box">タイム: <span id="timeVal">0.00</span> 秒</div>
+      <div id="progressWrap"><div id="progressBar"></div></div>
+      <div id="crashFlash"></div>
+      <button class="touchBtn" id="tcLeanBack" type="button">↑</button>
+      <button class="touchBtn" id="tcLeanFwd" type="button">↓</button>
+      <div id="tcHint">タップでジャンプ</div>
+      <button id="soundToggleBtn" type="button" title="効果音のON/OFF">🔊</button>
+      <div id="versionLabel">v0.1.0</div>
+
+      <div id="startOverlay" class="overlay">
+        <div class="overlay-card">
+          <h1>走れニンニクマン</h1>
+          <p>自動走行、操作不要!<br>Space/タップ: ジャンプ(穴・障害物に注意)<br>↑↓: 空中姿勢制御(着地で加減速)</p>
+          <button class="btn wide" id="startBtn">スタート [Enter]</button>
+        </div>
+      </div>
+
+      <div id="goalOverlay" class="overlay hidden">
+        <div class="overlay-card">
+          <img class="overlay-mascot" id="overlayMascotImg" alt="ニンニクマン">
+          <h1 id="goalTitle">ゴール!</h1>
+          <p id="goalStats"></p>
+          <div id="scoreSubmit" class="hidden">
+            <p id="rankResultText" class="hidden"></p>
+            <input id="nameInput" type="text" maxlength="12" placeholder="なまえ(12文字まで)">
+            <button class="btn wide" id="submitScoreBtn">ランキングに登録</button>
+            <button class="btn secondary wide" id="shareScoreBtn">Xでシェア</button>
+          </div>
+          <button class="btn secondary wide" id="retryBtn">もう一度</button>
+          <button class="btn secondary wide" id="backToStartBtn">スタートに戻る</button>
+        </div>
+      </div>
+
+      <div id="rankingOverlay" class="overlay hidden">
+        <div class="overlay-card" style="width:340px;">
+          <h1>ランキング</h1>
+          <ul id="rankingEntries"></ul>
+          <button class="btn wide" id="closeRankingBtn">とじる</button>
+        </div>
+      </div>
+
+      <div id="pauseOverlay" class="overlay hidden">
+        <div class="overlay-card">
+          <h1>PAUSE</h1>
+          <button class="btn wide" id="resumeBtn">再開 [P]</button>
+        </div>
+      </div>
     </div>
-  </div>
 
-  <div id="rankingOverlay" class="overlay hidden">
-    <h1>ランキング</h1>
-    <ul id="rankingEntries"></ul>
-    <button class="btn" id="closeRankingBtn">とじる</button>
-  </div>
-
-  <div id="pauseOverlay" class="overlay hidden">
-    <h1>PAUSE</h1>
-    <button class="btn" id="resumeBtn">再開 [P]</button>
+    <div id="buttonPanel">
+      <div class="btn-row">
+        <button class="btn secondary" id="pauseBtn">一時停止 [P]</button>
+        <button class="btn secondary" id="restartBtn">やり直す [R]</button>
+        <button class="btn secondary" id="rankingBtn">ランキング [L]</button>
+        <button class="btn secondary" id="popupBtn">ポップアップ化 [O]</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -127,14 +214,13 @@ const JUMP_VOICE_3_RARE_SRC = "data:audio/wav;base64,UklGRjRnAQBXQVZFZm10IBIAAAA
   const distTotalEl = document.getElementById('distTotal');
   const timeValEl = document.getElementById('timeVal');
   const progressBarEl = document.getElementById('progressBar');
-  const bubbleEl = document.getElementById('bubble');
-  const mascotImgEl = document.getElementById('mascotImg');
+  const headerMascotImgEl = document.getElementById('headerMascotImg');
   const crashFlashEl = document.getElementById('crashFlash');
 
   // ---------- Character art (ニンニクマン) ----------
   const charImg = new Image();
   charImg.src = NINNIKU_CHAR_SRC;
-  mascotImgEl.src = NINNIKU_CHAR_SRC;
+  headerMascotImgEl.src = NINNIKU_CHAR_SRC;
 
   // ---------- ジャンプ段数ごとのニンニクマンの掛け声(音声OFF切り替え可能) ----------
   const soundToggleBtnEl = document.getElementById('soundToggleBtn');
@@ -192,6 +278,7 @@ const JUMP_VOICE_3_RARE_SRC = "data:audio/wav;base64,UklGRjRnAQBXQVZFZm10IBIAAAA
 
   // ---------- Responsive scale (reused pattern from tetris_ninniku.html) ----------
   const popupMode = new URLSearchParams(location.search).get('popup') === '1';
+  if(popupMode) document.documentElement.classList.add('popup-mode');
   function fitToWindow(){
     wrapEl.style.transform = 'none';
     const w = wrapEl.offsetWidth, h = wrapEl.offsetHeight;
@@ -248,9 +335,13 @@ const JUMP_VOICE_3_RARE_SRC = "data:audio/wav;base64,UklGRjRnAQBXQVZFZm10IBIAAAA
     if(action === 'pause'){ togglePause(); }
     if(action === 'jump' && !e.repeat){ tryJump(); }
     if(e.code === 'Escape' && state !== 'start'){ backToStart(); }
+    if(e.code === 'KeyR'){ document.getElementById('restartBtn').click(); }
+    if(e.code === 'KeyL'){ document.getElementById('rankingBtn').click(); }
+    if(e.code === 'KeyO'){ document.getElementById('popupBtn').click(); }
     if(!goalOverlayEl.classList.contains('hidden')){
-      if(e.code === 'ArrowLeft' || e.code === 'ArrowUp'){ resultFocusIndex = 0; updateResultFocus(); }
-      if(e.code === 'ArrowRight' || e.code === 'ArrowDown'){ resultFocusIndex = 1; updateResultFocus(); }
+      const focusables = getResultFocusables();
+      if(e.code === 'ArrowLeft' || e.code === 'ArrowUp'){ resultFocusIndex = (resultFocusIndex - 1 + focusables.length) % focusables.length; updateResultFocus(); }
+      if(e.code === 'ArrowRight' || e.code === 'ArrowDown'){ resultFocusIndex = (resultFocusIndex + 1) % focusables.length; updateResultFocus(); }
     }
     if(e.code === 'Enter' || e.code === 'Space'){
       if(!startOverlayEl.classList.contains('hidden')){ startGame(); }
@@ -258,7 +349,7 @@ const JUMP_VOICE_3_RARE_SRC = "data:audio/wav;base64,UklGRjRnAQBXQVZFZm10IBIAAAA
         // ゴール/ゲームオーバー直後は、ジャンプの連打でそのまま結果画面を
         // 見ずに次へ進んでしまわないよう、少しの間だけ確定操作を無視する
         if(performance.now() < resultInputLockUntil) return;
-        (resultFocusIndex === 0 ? retryBtnEl : backToStartBtnEl).click();
+        getResultFocusables()[resultFocusIndex].click();
       }
     }
   });
@@ -433,8 +524,14 @@ const JUMP_VOICE_3_RARE_SRC = "data:audio/wav;base64,UklGRjRnAQBXQVZFZm10IBIAAAA
     startOverlayEl.classList.remove('hidden');
   }
 
+  function getResultFocusables(){
+    return scoreSubmitEl.classList.contains('hidden')
+      ? [retryBtnEl, backToStartBtnEl]
+      : [submitScoreBtnEl, shareScoreBtnEl, retryBtnEl, backToStartBtnEl];
+  }
+
   function updateResultFocus(){
-    const focusables = [retryBtnEl, backToStartBtnEl];
+    const focusables = getResultFocusables();
     focusables.forEach((btn, i) => {
       btn.classList.toggle('gameover-selected', i === resultFocusIndex);
       btn.classList.toggle('gameover-unselected', i !== resultFocusIndex);
@@ -445,9 +542,9 @@ const JUMP_VOICE_3_RARE_SRC = "data:audio/wav;base64,UklGRjRnAQBXQVZFZm10IBIAAAA
     state = 'gameover';
     goalTitleEl.textContent = 'ゲームオーバー';
     goalStatsEl.textContent = reason;
+    hideScoreSubmit();
     resultFocusIndex = 0;
     updateResultFocus();
-    hideScoreSubmit();
     resultInputLockUntil = performance.now() + 600;
     goalOverlayEl.classList.remove('hidden');
     crashFlashEl.style.transition = 'none';
@@ -706,12 +803,16 @@ const JUMP_VOICE_3_RARE_SRC = "data:audio/wav;base64,UklGRjRnAQBXQVZFZm10IBIAAAA
     });
   }
 
+  let rankingReturnToPlay = false;
   function openRanking(){
+    if(state === 'play'){ state = 'paused'; rankingReturnToPlay = true; }
+    else { rankingReturnToPlay = false; }
     rankingOverlayEl.classList.remove('hidden');
     renderRankingList();
   }
   function closeRanking(){
     rankingOverlayEl.classList.add('hidden');
+    if(rankingReturnToPlay){ state = 'play'; lastTime = performance.now(); rankingReturnToPlay = false; }
   }
 
   function showScoreSubmit(valueMs){
@@ -723,12 +824,10 @@ const JUMP_VOICE_3_RARE_SRC = "data:audio/wav;base64,UklGRjRnAQBXQVZFZm10IBIAAAA
     submitScoreBtnEl.disabled = false;
     shareScoreBtnEl.textContent = 'Xでシェア';
     scoreSubmitEl.classList.remove('hidden');
-    retryBtnEl.classList.add('secondary'); // 登録ボタンが主役なので、もう一度は控えめに
   }
   function hideScoreSubmit(){
     pendingSubmit = null;
     scoreSubmitEl.classList.add('hidden');
-    retryBtnEl.classList.remove('secondary');
   }
 
   submitScoreBtnEl.addEventListener('click', async () => {
@@ -768,15 +867,17 @@ const JUMP_VOICE_3_RARE_SRC = "data:audio/wav;base64,UklGRjRnAQBXQVZFZm10IBIAAAA
 
   rankingBtnEl.addEventListener('click', openRanking);
   closeRankingBtnEl.addEventListener('click', closeRanking);
+  document.getElementById('pauseBtn').addEventListener('click', togglePause);
+  document.getElementById('restartBtn').addEventListener('click', startGame);
 
   function finishGoal(){
     state = 'goal';
     goalTitleEl.textContent = 'ゴール!';
     const finalMs = elapsed * 1000;
     goalStatsEl.textContent = 'タイム: ' + formatClearTime(finalMs);
+    showScoreSubmit(finalMs);
     resultFocusIndex = 0;
     updateResultFocus();
-    showScoreSubmit(finalMs);
     checkAndShowRank(finalMs);
     resultInputLockUntil = performance.now() + 600;
     goalOverlayEl.classList.remove('hidden');
