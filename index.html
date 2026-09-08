@@ -351,6 +351,7 @@ const JUMP_VOICE_3_SRC = "data:audio/wav;base64,UklGRg7OAABXQVZFZm10IBIAAAABAAEA
   let resultFocusIndex = 0; // 0 = もう一度, 1 = スタートに戻る (goal/gameover画面での選択)
   let resultInputLockUntil = 0; // この時刻までは結果画面のEnter/Space確定を無視する
   let comboPopup = null; // { text, timer, maxTimer } — 連続ジャンプ成功時に浮かぶ表示
+  let dustPuffs = []; // 最速で3段ジャンプを繋げられなかった時に足元へ出す砂煙
 
   function resetPlayer(){
     player = {
@@ -366,6 +367,7 @@ const JUMP_VOICE_3_SRC = "data:audio/wav;base64,UklGRg7OAABXQVZFZm10IBIAAAABAAEA
     camX = 0;
     elapsed = 0;
     comboPopup = null;
+    dustPuffs = [];
   }
 
   function startGame(){
@@ -537,6 +539,14 @@ const JUMP_VOICE_3_SRC = "data:audio/wav;base64,UklGRg7OAABXQVZFZm10IBIAAAABAAEA
       comboPopup.timer -= dt * 1000;
       if(comboPopup.timer <= 0) comboPopup = null;
     }
+    for(let i = dustPuffs.length - 1; i >= 0; i--){
+      const d = dustPuffs[i];
+      d.life -= dt * 1000;
+      d.x += d.vx * dt;
+      d.y += d.vy * dt;
+      d.vy += 40 * dt;
+      if(d.life <= 0) dustPuffs.splice(i, 1);
+    }
 
     if(!player.airborne){
       const info = groundInfoAt(player.x);
@@ -557,7 +567,10 @@ const JUMP_VOICE_3_SRC = "data:audio/wav;base64,UklGRg7OAABXQVZFZm10IBIAAAABAAEA
 
         if(player.chainTimer > 0){
           player.chainTimer -= dt * 1000;
-          if(player.chainTimer <= 0) player.jumpChain = 0; // 猶予切れで3段ジャンプの連鎖が途切れる
+          if(player.chainTimer <= 0){
+            player.jumpChain = 0; // 猶予切れで3段ジャンプの連鎖が途切れる
+            spawnDustPuff(player.x, player.y); // マリオ64と同じく、最速で跳べなかった時だけ足元に砂煙
+          }
         }
       }
     }
@@ -1007,6 +1020,7 @@ const JUMP_VOICE_3_SRC = "data:audio/wav;base64,UklGRg7OAABXQVZFZm10IBIAAAABAAEA
     drawGround();
     drawObstacles();
     drawPipe();
+    drawDustPuffs();
 
     if(state === 'intro' && introPhase === 'rise'){
       // 土管のフチまでせり上がる途中は、フチより下の部分をクリップして隠す
@@ -1039,6 +1053,36 @@ const JUMP_VOICE_3_SRC = "data:audio/wav;base64,UklGRg7OAABXQVZFZm10IBIAAAABAAEA
     ctx.strokeText(comboPopup.text, sx, sy);
     ctx.fillText(comboPopup.text, sx, sy);
     ctx.restore();
+  }
+
+  function spawnDustPuff(worldX, groundY){
+    for(let i = 0; i < 5; i++){
+      const ang = Math.PI + (Math.random() - 0.5) * Math.PI * 0.8; // 主に上向きに広がる
+      const speed = 16 + Math.random() * 22;
+      dustPuffs.push({
+        x: worldX + (Math.random() - 0.5) * 10,
+        y: groundY - 2,
+        vx: Math.cos(ang) * speed,
+        vy: Math.sin(ang) * speed,
+        life: 380 + Math.random() * 140,
+        maxLife: 500,
+        r: 3 + Math.random() * 3,
+      });
+    }
+  }
+
+  function drawDustPuffs(){
+    for(const d of dustPuffs){
+      const t = Math.max(0, d.life / d.maxLife);
+      const sx = d.x - camX;
+      ctx.save();
+      ctx.globalAlpha = t * 0.55;
+      ctx.fillStyle = '#e8e2d0';
+      ctx.beginPath();
+      ctx.arc(sx, d.y, d.r * (1.6 - t * 0.6), 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
   }
 
   // ---------- Main loop ----------
