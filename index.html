@@ -485,6 +485,7 @@ const JUMP_VOICE_3_RARE_SRC = "data:audio/wav;base64,UklGRjRnAQBXQVZFZm10IBIAAAA
     hideScoreSubmit();
     distTotalEl.textContent = Math.round(GOAL_X / 10);
     timeValEl.textContent = '0.00';
+    issueRunToken();
   }
 
   function updateIntro(dt){
@@ -731,7 +732,20 @@ const JUMP_VOICE_3_RARE_SRC = "data:audio/wav;base64,UklGRjRnAQBXQVZFZm10IBIAAAA
   // Cloudflare Workerを経由してGitHub Issue化し、GitHub Actionsでranking-clear.jsonを更新する。
   // Worker未デプロイの間は登録に失敗するだけで、閲覧(ランキング表示)は空一覧として動作する。
   const RANKING_SUBMIT_URL = 'https://ninniku-chari.rapidpredict.workers.dev/';
+  const RANKING_START_URL = RANKING_SUBMIT_URL + 'start';
   let pendingSubmit = null;
+  // スタート時にサーバーへ署名付きトークンを発行してもらい、ゴール時にそのトークンと
+  // 一緒に送る。サーバー側はトークン発行からの実経過時間より速いタイムを拒否するので、
+  // DevTools等からゲームを介さず直接送信しても登録できない(不正対策)。
+  let currentRunToken = null;
+  async function issueRunToken(){
+    currentRunToken = null;
+    try{
+      const res = await fetch(RANKING_START_URL, { method: 'POST' });
+      const data = await res.json().catch(() => null);
+      if(res.ok && data && data.ok && data.token) currentRunToken = data.token;
+    }catch(e){ /* ネットワーク不通なら currentRunToken は null のまま(登録時にエラー表示) */ }
+  }
 
   function formatClearTime(ms){
     const totalMs = Math.round(ms);
@@ -837,13 +851,17 @@ const JUMP_VOICE_3_RARE_SRC = "data:audio/wav;base64,UklGRjRnAQBXQVZFZm10IBIAAAA
     if(!name) name = '名無しさん';
     try{ localStorage.setItem('ninniku-chari-playername', name); }catch(e){ /* ignore */ }
     const { value } = pendingSubmit;
+    if(!currentRunToken){
+      submitScoreBtnEl.textContent = '登録に失敗しました(プレイ確認トークンがありません)';
+      return;
+    }
     submitScoreBtnEl.disabled = true;
     submitScoreBtnEl.textContent = '登録中…';
     try{
       const res = await fetch(RANKING_SUBMIT_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: 'clear', value, name }),
+        body: JSON.stringify({ mode: 'clear', value, name, token: currentRunToken }),
       });
       const data = await res.json().catch(() => null);
       if(res.ok && data && data.ok){
