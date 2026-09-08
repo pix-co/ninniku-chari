@@ -247,6 +247,9 @@ const JUMP_VOICE_3_SRC = "data:audio/wav;base64,UklGRg7OAABXQVZFZm10IBIAAAABAAEA
     if(e.code === 'Enter' || e.code === 'Space'){
       if(!startOverlayEl.classList.contains('hidden')){ startGame(); }
       else if(!goalOverlayEl.classList.contains('hidden')){
+        // ゴール/ゲームオーバー直後は、ジャンプの連打でそのまま結果画面を
+        // 見ずに次へ進んでしまわないよう、少しの間だけ確定操作を無視する
+        if(performance.now() < resultInputLockUntil) return;
         (resultFocusIndex === 0 ? retryBtnEl : backToStartBtnEl).click();
       }
     }
@@ -346,6 +349,7 @@ const JUMP_VOICE_3_SRC = "data:audio/wav;base64,UklGRg7OAABXQVZFZm10IBIAAAABAAEA
   let state = 'start'; // 'start' | 'intro' | 'play' | 'paused' | 'goal' | 'gameover'
   let player, camX, elapsed, lastTime, introTimer, introPhase;
   let resultFocusIndex = 0; // 0 = もう一度, 1 = スタートに戻る (goal/gameover画面での選択)
+  let resultInputLockUntil = 0; // この時刻までは結果画面のEnter/Space確定を無視する
   let comboPopup = null; // { text, timer, maxTimer } — 連続ジャンプ成功時に浮かぶ表示
 
   function resetPlayer(){
@@ -431,6 +435,7 @@ const JUMP_VOICE_3_SRC = "data:audio/wav;base64,UklGRg7OAABXQVZFZm10IBIAAAABAAEA
     resultFocusIndex = 0;
     updateResultFocus();
     hideScoreSubmit();
+    resultInputLockUntil = performance.now() + 600;
     goalOverlayEl.classList.remove('hidden');
     crashFlashEl.style.transition = 'none';
     crashFlashEl.style.opacity = '0.5';
@@ -737,6 +742,7 @@ const JUMP_VOICE_3_SRC = "data:audio/wav;base64,UklGRg7OAABXQVZFZm10IBIAAAABAAEA
     updateResultFocus();
     showScoreSubmit(finalMs);
     checkAndShowRank(finalMs);
+    resultInputLockUntil = performance.now() + 600;
     goalOverlayEl.classList.remove('hidden');
   }
 
