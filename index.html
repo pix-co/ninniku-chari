@@ -332,6 +332,7 @@ const JUMP_VOICE_3_SRC = "data:audio/wav;base64,UklGRg7OAABXQVZFZm10IBIAAAABAAEA
   // マリオ64風の3段ジャンプ: 着地してすぐ(CHAIN_WINDOW_MS以内に)再ジャンプすると
   // 段数が上がってジャンプが高くなり、3段目でめっちゃ加速する。段数はそこでリセット。
   const CHAIN_WINDOW_MS = 300;
+  const FAST_CHAIN_MS = 120; // これより速く再ジャンプできたら「最速フレーム」扱いで砂煙を取り消す
   const JUMP_IMPULSE_LV = [1, 1.3, 1.7];
   const TRIPLE_JUMP_SPEED_BOOST = 1.6;
 
@@ -352,6 +353,7 @@ const JUMP_VOICE_3_SRC = "data:audio/wav;base64,UklGRg7OAABXQVZFZm10IBIAAAABAAEA
   let resultInputLockUntil = 0; // この時刻までは結果画面のEnter/Space確定を無視する
   let comboPopup = null; // { text, timer, maxTimer } — 連続ジャンプ成功時に浮かぶ表示
   let dustPuffs = []; // 最速で3段ジャンプを繋げられなかった時に足元へ出す砂煙
+  let dustBatchCounter = 0;
 
   function resetPlayer(){
     player = {
@@ -363,6 +365,8 @@ const JUMP_VOICE_3_SRC = "data:audio/wav;base64,UklGRg7OAABXQVZFZm10IBIAAAABAAEA
       jumpStreak: 0,
       jumpChain: 0,
       chainTimer: 0,
+      lastLandTime: 0,
+      lastDustBatch: -1,
     };
     camX = 0;
     elapsed = 0;
@@ -482,10 +486,13 @@ const JUMP_VOICE_3_SRC = "data:audio/wav;base64,UklGRg7OAABXQVZFZm10IBIAAAABAAEA
     // 着地と同時にジャンプ入力があれば、タイミングを讃えて少し加速する
     if(heldActions.has('jump')){
       player.speed = Math.min(MAX_SPEED, player.speed * 1.08);
-    } else {
-      // 最速フレームで再ジャンプできなかった場合は、マリオ64と同じく足元に砂煙
-      spawnDustPuff(player.x, player.y);
     }
+
+    // 一旦、着地の砂煙を出しておく。この直後(FAST_CHAIN_MS以内)に再ジャンプ
+    // できたら「最速フレーム」とみなし、tryJump側でこの砂煙を取り消す
+    player.lastLandTime = performance.now();
+    player.lastDustBatch = ++dustBatchCounter;
+    spawnDustPuff(player.x, player.y, player.lastDustBatch);
 
     // すぐに再ジャンプすれば3段ジャンプに繋げられる猶予時間をセット
     player.chainTimer = CHAIN_WINDOW_MS;
@@ -495,6 +502,11 @@ const JUMP_VOICE_3_SRC = "data:audio/wav;base64,UklGRg7OAABXQVZFZm10IBIAAAABAAEA
     if(state !== 'play' || player.airborne) return;
     const info = groundInfoAt(player.x);
     const angle = info ? info.angle : 0;
+
+    // 着地からFAST_CHAIN_MS以内の最速再ジャンプなら、さっき出した着地の砂煙を取り消す
+    if(performance.now() - player.lastLandTime < FAST_CHAIN_MS){
+      dustPuffs = dustPuffs.filter(d => d.batchId !== player.lastDustBatch);
+    }
 
     if(player.jumpChain > 0 && player.chainTimer > 0){
       player.jumpChain = Math.min(3, player.jumpChain + 1);
@@ -1055,7 +1067,7 @@ const JUMP_VOICE_3_SRC = "data:audio/wav;base64,UklGRg7OAABXQVZFZm10IBIAAAABAAEA
     ctx.restore();
   }
 
-  function spawnDustPuff(worldX, groundY){
+  function spawnDustPuff(worldX, groundY, batchId){
     for(let i = 0; i < 9; i++){
       const ang = Math.PI + (Math.random() - 0.5) * Math.PI * 0.9; // 主に上向きに広がる
       const speed = 24 + Math.random() * 34;
@@ -1067,6 +1079,7 @@ const JUMP_VOICE_3_SRC = "data:audio/wav;base64,UklGRg7OAABXQVZFZm10IBIAAAABAAEA
         life: 420 + Math.random() * 160,
         maxLife: 580,
         r: 5 + Math.random() * 4,
+        batchId,
       });
     }
   }
