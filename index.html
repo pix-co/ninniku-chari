@@ -746,16 +746,20 @@ const JUMP_VOICE_3_SRC = "data:audio/wav;base64,UklGRg7OAABXQVZFZm10IBIAAAABAAEA
     ctx.strokeStyle = '#2f6e35';
     ctx.lineWidth = 4;
     let drawing = false;
+    let chunkStartSx = 0;
     ctx.beginPath();
     for(let i = 0; i < terrain.length; i++){
       const p = terrain[i];
       const sx = p.x - camX;
-      if(!drawing){ ctx.moveTo(sx, p.y); drawing = true; }
+      if(!drawing){ ctx.moveTo(sx, p.y); drawing = true; chunkStartSx = sx; }
       else ctx.lineTo(sx, p.y);
       if(p.gapAfter){
-        // close and fill this ground chunk, start a new one after the gap
+        // close and fill this ground chunk (flat bottom back to this chunk's
+        // own start — NOT terrain[0] — otherwise closePath() connects the
+        // gap edge diagonally back up to the start's surface height instead
+        // of along y=540, leaving a wedge of the chunk unfilled)
         ctx.lineTo(sx, 540);
-        ctx.lineTo((terrain[i].x - camX), 540);
+        ctx.lineTo(chunkStartSx, 540);
         ctx.closePath();
         ctx.fill();
         ctx.beginPath();
@@ -765,7 +769,7 @@ const JUMP_VOICE_3_SRC = "data:audio/wav;base64,UklGRg7OAABXQVZFZm10IBIAAAABAAEA
     if(drawing){
       const last = terrain[terrain.length - 1];
       ctx.lineTo(last.x - camX, 540);
-      ctx.lineTo(terrain[0].x - camX, 540);
+      ctx.lineTo(chunkStartSx, 540);
       ctx.closePath();
       ctx.fill();
     }
@@ -820,7 +824,7 @@ const JUMP_VOICE_3_SRC = "data:audio/wav;base64,UklGRg7OAABXQVZFZm10IBIAAAABAAEA
 
   function drawCastleBackdrop(){
     // マリオ64のピーチ城の庭っぽい遠景(オリジナル画で再現。実際の画像素材は使用していない)
-    const parallaxSky = 0.1, parallaxHill = 0.25, parallaxCastle = 0.35;
+    const parallaxSky = 0.1, parallaxHill = 0.25;
 
     // 空の雲
     ctx.fillStyle = 'rgba(255,255,255,.85)';
@@ -848,8 +852,10 @@ const JUMP_VOICE_3_SRC = "data:audio/wav;base64,UklGRg7OAABXQVZFZm10IBIAAAABAAEA
     }
 
     // ピーチ城っぽい城のシルエット(1回だけ、コース序盤の背景に固定)
-    const castleWorldX = 260;
-    const cx = castleWorldX * (1 - parallaxCastle) + (castleWorldX - camX) * parallaxCastle;
+    // ゴール付近に固定表示(遠景ではなく地形と同じ1:1スクロールにして、
+    // ゴールに近づいてもズレずにちゃんとその場に立っているようにする)
+    const castleWorldX = GOAL_X - 190;
+    const cx = castleWorldX - camX;
     const baseY = GROUND_BASE - 40;
     ctx.fillStyle = '#e9dfc7';
     ctx.strokeStyle = '#b7a67e';
@@ -926,7 +932,10 @@ const JUMP_VOICE_3_SRC = "data:audio/wav;base64,UklGRg7OAABXQVZFZm10IBIAAAABAAEA
     ctx.strokeStyle = '#245c1b';
     ctx.lineWidth = 3;
     const bodyTop = PIPE_TOP + PIPE_RIM_H;
-    const bodyBottom = GROUND_BASE + 30;
+    // 地面より下は塗っても地形の下に隠れるはずが、地形より後に描画しているため
+    // 前面に浮いて見えてしまっていた。地面の高さでぴったり止めて隠れる部分を描かない。
+    const groundHereInfo = groundInfoAt(PIPE_X);
+    const bodyBottom = groundHereInfo ? groundHereInfo.y : GROUND_BASE;
     ctx.fillRect(gx - PIPE_W / 2 + 5, bodyTop, PIPE_W - 10, bodyBottom - bodyTop);
     ctx.strokeRect(gx - PIPE_W / 2 + 5, bodyTop, PIPE_W - 10, bodyBottom - bodyTop);
     ctx.fillRect(gx - PIPE_W / 2, PIPE_TOP, PIPE_W, PIPE_RIM_H + 4);
