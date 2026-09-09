@@ -1150,8 +1150,9 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
 
   shareScoreBtnEl.addEventListener('click', () => {
     if(!pendingSubmit) return;
-    const distM = Math.round((STAGES[pendingSubmit.stageId] || STAGES[1]).goalX / 10);
-    const text = '走れニンニクマンで' + distM + 'mを ' + formatClearTime(pendingSubmit.value) + ' でクリアしました！ #走れニンニクマン';
+    const stage = STAGES[pendingSubmit.stageId] || STAGES[1];
+    const stageName = stage.name.includes(': ') ? stage.name.split(': ')[1] : stage.name;
+    const text = '走れニンニクマンで' + stageName + 'を ' + formatClearTime(pendingSubmit.value) + ' でクリアしました！ #走れニンニクマン';
     const url = location.href;
     const intentUrl = 'https://twitter.com/intent/tweet?text=' + encodeURIComponent(text) + '&url=' + encodeURIComponent(url);
     window.open(intentUrl, '_blank', 'noopener,noreferrer');
