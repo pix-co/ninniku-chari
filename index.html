@@ -553,14 +553,17 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
         { x: 10000, y: GROUND_BASE },      // goal
       ],
       obstacles: [
-        { x: 550,  w: 26, h: 24 },
-        { x: 1250, w: 28, h: 24 },
-        { x: 1950, w: 24, h: 22 },
-        { x: 3450, w: 30, h: 26 },
-        { x: 6350, w: 24, h: 22 },
-        { x: 7350, w: 28, h: 24 },
-        { x: 8700, w: 26, h: 24 },
-        { x: 9350, w: 24, h: 22 },
+        { x: 550,  w: 26, h: 24, type: 'rock' },
+        { x: 1050, w: 34, h: 34, type: 'fuwafuwa', bounce: true }, // 踏むと大ジャンプできる
+        { x: 1250, w: 30, h: 30, type: 'snowman' },
+        { x: 1950, w: 24, h: 22, type: 'rock' },
+        { x: 2600, w: 34, h: 34, type: 'fuwafuwa', bounce: true },
+        { x: 3450, w: 32, h: 32, type: 'snowman' },
+        { x: 6350, w: 24, h: 22, type: 'rock' },
+        { x: 6600, w: 34, h: 34, type: 'fuwafuwa', bounce: true },
+        { x: 7350, w: 30, h: 30, type: 'snowman' },
+        { x: 8700, w: 26, h: 24, type: 'rock' },
+        { x: 9350, w: 30, h: 30, type: 'snowman' },
         { x: 9600, w: 44, h: 44, penguin: true }, // 終盤のペンギンの親。当たったらゲームオーバー
       ],
       theme: {
@@ -881,6 +884,17 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
       const groundY = info ? info.y : GROUND_BASE;
       const clearance = groundY - player.y; // how high above local ground the player currently is
       if(clearance < ob.h){
+        if(ob.bounce){
+          // ふわふわさん: ぶつかる(踏む)と大ジャンプで跳ね上がる。ゲームオーバーにはしない
+          player.airborne = true;
+          player.vx = player.speed;
+          player.vy = -JUMP_IMPULSE * 2.4;
+          player.jumpChain = 0;
+          player.chainTimer = 0;
+          playJumpVoice(3);
+          comboPopup = { text: '大ジャンプ!!', timer: 1000, maxTimer: 1000, big: true };
+          return false;
+        }
         gameOver(ob.penguin ? 'ペンギンの親にぶつかってしまった…' : '障害物にぶつかってしまった…');
         return true;
       }
@@ -1595,6 +1609,121 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
         }
         continue;
       }
+      if(ob.type === 'rock'){
+        // ゴツゴツした岩: 地面に半円状に埋まった輪郭を、頂点ごとに
+        // hash01でジッターさせていびつな見た目にする
+        const cx = gx + ob.w / 2;
+        const pts = 7;
+        ctx.fillStyle = THEME.obstacleFill;
+        ctx.strokeStyle = THEME.obstacleStroke;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        for(let i = 0; i <= pts; i++){
+          const t = i / pts;
+          const angle = Math.PI + t * Math.PI;
+          const jitter = 0.75 + hash01(ob.x * 3.1 + i * 7.7) * 0.35;
+          const px = cx + Math.cos(angle) * (ob.w / 2) * jitter;
+          const py = baseY + Math.sin(angle) * ob.h * jitter;
+          if(i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        continue;
+      }
+      if(ob.type === 'snowman'){
+        const cx = gx + ob.w / 2;
+        const bodyR = ob.w * 0.48;
+        const headR = ob.w * 0.32;
+        const bodyCy = baseY - bodyR;
+        const headCy = bodyCy - bodyR * 0.85 - headR * 0.85;
+        ctx.fillStyle = '#ffffff';
+        ctx.strokeStyle = '#b9d3e0';
+        ctx.lineWidth = 2;
+        for(const [cy, r] of [[bodyCy, bodyR], [headCy, headR]]){
+          ctx.beginPath();
+          ctx.arc(cx, cy, r, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+        }
+        ctx.fillStyle = '#2b2b2b';
+        ctx.beginPath();
+        ctx.arc(cx - headR * 0.35, headCy - headR * 0.1, headR * 0.12, 0, Math.PI * 2);
+        ctx.arc(cx + headR * 0.35, headCy - headR * 0.1, headR * 0.12, 0, Math.PI * 2);
+        ctx.arc(cx, bodyCy - bodyR * 0.35, bodyR * 0.13, 0, Math.PI * 2);
+        ctx.arc(cx, bodyCy + bodyR * 0.15, bodyR * 0.13, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#e2882f';
+        ctx.beginPath();
+        ctx.moveTo(cx, headCy + headR * 0.05);
+        ctx.lineTo(cx + headR * 0.55, headCy + headR * 0.18);
+        ctx.lineTo(cx, headCy + headR * 0.3);
+        ctx.closePath();
+        ctx.fill();
+        continue;
+      }
+      if(ob.type === 'fuwafuwa'){
+        // ふわふわさん: 葉っぱ襟付きの鉢(左右で色を変えて宝石のような面取り感を出す)+
+        // 白い丸顔(目・口)+ 頭上の花。踏むと大ジャンプできるボーナス的な障害物
+        const cx = gx + ob.w / 2;
+        const potTopY = baseY - ob.h * 0.55;
+        const potMidY = baseY - ob.h * 0.22;
+        ctx.fillStyle = '#e0c23a';
+        ctx.beginPath();
+        ctx.moveTo(cx, potTopY);
+        ctx.lineTo(cx + ob.w * 0.5, potMidY);
+        ctx.lineTo(cx, baseY);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = '#3f8f4a';
+        ctx.beginPath();
+        ctx.moveTo(cx, potTopY);
+        ctx.lineTo(cx - ob.w * 0.5, potMidY);
+        ctx.lineTo(cx, baseY);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = '#2b5c33';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(cx - ob.w * 0.5, potMidY);
+        ctx.lineTo(cx, potTopY);
+        ctx.lineTo(cx + ob.w * 0.5, potMidY);
+        ctx.stroke();
+        // 頭(白い丸)
+        const headR = ob.w * 0.42;
+        const headCy = potTopY - headR * 0.75;
+        ctx.fillStyle = '#ffffff';
+        ctx.strokeStyle = '#c9d6da';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(cx, headCy, headR, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = '#1c1c1c';
+        ctx.beginPath();
+        ctx.arc(cx - headR * 0.4, headCy - headR * 0.05, headR * 0.16, 0, Math.PI * 2);
+        ctx.arc(cx + headR * 0.4, headCy - headR * 0.05, headR * 0.16, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#d43f3f';
+        ctx.beginPath();
+        ctx.arc(cx, headCy + headR * 0.35, headR * 0.14, 0, Math.PI * 2);
+        ctx.fill();
+        // 頭上の花(花びら5枚+中心)
+        const flowerCy = headCy - headR * 0.9;
+        const petalR = headR * 0.34;
+        for(let p = 0; p < 5; p++){
+          const ang = (Math.PI * 2 * p) / 5 - Math.PI / 2;
+          ctx.fillStyle = p % 2 === 0 ? '#f06a8a' : '#f7a8c0';
+          ctx.beginPath();
+          ctx.ellipse(cx + Math.cos(ang) * petalR, flowerCy + Math.sin(ang) * petalR, petalR * 0.85, petalR * 0.5, ang, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.fillStyle = '#f5d64c';
+        ctx.beginPath();
+        ctx.arc(cx, flowerCy, petalR * 0.55, 0, Math.PI * 2);
+        ctx.fill();
+        continue;
+      }
       ctx.fillStyle = THEME.obstacleFill;
       ctx.strokeStyle = THEME.obstacleStroke;
       ctx.lineWidth = 2;
@@ -1677,6 +1806,23 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
     ctx.restore();
   }
 
+  const CHASER_OFFSET = 130; // 追いかけてくるペンギンとの距離(ワールドpx)
+
+  function drawChaserPenguin(now){
+    if(currentStageId !== 2) return;
+    if(state !== 'play' && state !== 'intro') return;
+    const chaseX = player.x - CHASER_OFFSET;
+    if(chaseX < 0) return;
+    const sx = chaseX - camX;
+    if(sx < -40 || sx > 1000) return;
+    if(!(penguinImg.complete && penguinImg.naturalWidth)) return;
+    const info = groundInfoAt(chaseX);
+    const groundY = info ? info.y : GROUND_BASE;
+    const bob = Math.abs(Math.sin(now / 110)) * 4;
+    const pw = 30, ph = 30;
+    ctx.drawImage(penguinImg, sx - pw / 2, groundY - ph - bob, pw, ph);
+  }
+
   function draw(now){
     ctx.clearRect(0, 0, 960, 540);
     // sky gradient
@@ -1690,6 +1836,7 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
     drawGround();
     drawObstacles();
     drawPipe();
+    drawChaserPenguin(now);
     drawDustPuffs();
 
     if(state === 'intro' && introPhase === 'rise'){
