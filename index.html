@@ -188,6 +188,7 @@
       <div id="rankingOverlay" class="overlay hidden">
         <div class="overlay-card" style="width:920px;">
           <h1 id="rankingTitle">ランキング</h1>
+          <p style="text-align:center; margin-top:-8px;">←→キーでステージ切替</p>
           <ul id="rankingEntries"></ul>
           <button class="btn wide" id="closeRankingBtn">とじる</button>
         </div>
@@ -396,6 +397,13 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
     }
     if(!rankingOverlayEl.classList.contains('hidden')){
       if(e.code === 'Escape' || e.code === 'Enter' || e.code === 'Space'){ e.preventDefault(); closeRanking(); }
+      if(e.code === 'ArrowLeft' || e.code === 'ArrowRight'){
+        e.preventDefault();
+        const idx = STAGE_ORDER.indexOf(rankingViewStageId);
+        const dir = e.code === 'ArrowLeft' ? -1 : 1;
+        rankingViewStageId = STAGE_ORDER[(idx + dir + STAGE_ORDER.length) % STAGE_ORDER.length];
+        renderRankingList();
+      }
       return;
     }
     const action = actionForCode(e.code);
@@ -1039,13 +1047,15 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
   }
 
   async function renderRankingList(){
-    rankingTitleEl.textContent = 'ランキング(' + STAGES[currentStageId].name + ')';
+    const viewStageId = rankingViewStageId;
+    rankingTitleEl.textContent = 'ランキング(' + STAGES[viewStageId].name + ')';
     rankingEntriesEl.innerHTML = '';
     const loadingLi = document.createElement('li');
     loadingLi.textContent = '読み込み中…';
     loadingLi.className = 'rank-empty';
     rankingEntriesEl.appendChild(loadingLi);
-    const list = await fetchRanking(currentStageId);
+    const list = await fetchRanking(viewStageId);
+    if(viewStageId !== rankingViewStageId) return; // 取得中にステージが切り替えられた
     rankingEntriesEl.innerHTML = '';
     if(list === null){
       const li = document.createElement('li');
@@ -1079,9 +1089,11 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
   }
 
   let rankingReturnToPlay = false;
+  let rankingViewStageId = 1;
   function openRanking(){
     if(state === 'play'){ state = 'paused'; rankingReturnToPlay = true; }
     else { rankingReturnToPlay = false; }
+    rankingViewStageId = currentStageId;
     rankingOverlayEl.classList.remove('hidden');
     renderRankingList();
   }
