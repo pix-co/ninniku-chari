@@ -87,6 +87,8 @@
   .btn:active{ transform: translateY(3px); box-shadow: 0 1px 0 var(--outline-dark); }
   .btn.secondary{ background: var(--panel); color: var(--terracotta); }
   .btn-row{ display:flex; gap:8px; }
+  #startOverlay .overlay-card{ width:520px; }
+  .stage-btn{ flex:1 1 0; min-width:0; white-space:nowrap; }
   .touchBtn{ position:absolute; width:64px; height:64px; border-radius:50%; background:var(--panel); border:3px solid var(--outline-dark); color:var(--terracotta); font-size:24px; font-weight:900; display:none; align-items:center; justify-content:center; user-select:none; -webkit-user-select:none; touch-action:none; box-shadow: 0 4px 0 var(--outline-dark); }
   .touchBtn.show{ display:flex; }
   .touchBtn:active{ transform:translateY(3px); box-shadow:0 1px 0 var(--outline-dark); }
@@ -156,8 +158,8 @@
             <h1>走れニンニクマン</h1>
             <p>自動走行、操作不要!<br>Space/タップ: ジャンプ(穴・障害物に注意)<br>↑↓: 空中姿勢制御(着地で加減速)</p>
             <div class="btn-row">
-              <button class="btn" id="stage1Btn" type="button" style="white-space:nowrap;">ステージ1 ニンニクガーデン</button>
-              <button class="btn" id="stage2Btn" type="button" style="white-space:nowrap;">ステージ2 さむいさむいマウンテン</button>
+              <button class="btn stage-btn" id="stage1Btn" type="button">ステージ1 ニンニクガーデン</button>
+              <button class="btn stage-btn" id="stage2Btn" type="button">ステージ2 さむいさむいマウンテン</button>
             </div>
           </div>
           <div id="modeSelectPanel" class="hidden" style="display:flex; flex-direction:column; gap:10px;">
@@ -652,6 +654,7 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
   let resultFocusIndex = 0; // 0 = もう一度, 1 = スタートに戻る (goal/gameover画面での選択)
   let resultInputLockUntil = 0; // この時刻までは結果画面のEnter/Space確定を無視する
   let comboPopup = null; // { text, timer, maxTimer } — 連続ジャンプ成功時に浮かぶ表示
+  let landingPopup = null; // { text, timer, maxTimer, color } — 着地角度の判定確認用デバッグ表示
   let dustPuffs = []; // 最速で3段ジャンプを繋げられなかった時に足元へ出す砂煙
 
   function resetPlayer(){
@@ -671,6 +674,7 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
     camX = 0;
     elapsed = 0;
     comboPopup = null;
+    landingPopup = null;
     dustPuffs = [];
   }
 
@@ -807,6 +811,11 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
     player.angle = groundAngle;
     player.spinSpeed = 0;
 
+    // 着地角度の判定を画面に出す(角度が合っているほど加速する仕様の確認用)
+    const landJudge = diffDeg <= LANDING_PERFECT_DEG ? 'PERFECT' : diffDeg <= LANDING_OK_DEG ? 'OK' : 'BAD';
+    const landColor = diffDeg <= LANDING_PERFECT_DEG ? '#2ecc71' : diffDeg <= LANDING_OK_DEG ? '#f1c40f' : '#e74c3c';
+    landingPopup = { text: landJudge + ' (' + diffDeg.toFixed(1) + '°)', timer: 700, maxTimer: 700, color: landColor };
+
     if(diffDeg <= LANDING_PERFECT_DEG){
       // perfect landing: speed boost
       player.speed = Math.min(MAX_SPEED, landedSpeed * 1.15);
@@ -907,6 +916,10 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
     if(comboPopup){
       comboPopup.timer -= dt * 1000;
       if(comboPopup.timer <= 0) comboPopup = null;
+    }
+    if(landingPopup){
+      landingPopup.timer -= dt * 1000;
+      if(landingPopup.timer <= 0) landingPopup = null;
     }
     for(let i = dustPuffs.length - 1; i >= 0; i--){
       const d = dustPuffs[i];
@@ -1897,7 +1910,25 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
     }
 
     drawComboPopup();
+    drawLandingPopup();
     if(THEME.snow) drawSnowfall(now);
+  }
+
+  function drawLandingPopup(){
+    if(!landingPopup || landingPopup.timer <= 0) return;
+    const t = Math.max(0, landingPopup.timer / landingPopup.maxTimer);
+    const sx = player.x - camX;
+    const sy = player.y - 40 - (1 - t) * 14;
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, t * 2);
+    ctx.font = 'bold 16px "Yu Gothic", Meiryo, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = '#2b2b2b';
+    ctx.fillStyle = landingPopup.color;
+    ctx.strokeText(landingPopup.text, sx, sy);
+    ctx.fillText(landingPopup.text, sx, sy);
+    ctx.restore();
   }
 
   function drawComboPopup(){
