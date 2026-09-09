@@ -1261,7 +1261,7 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
       const valSpan = document.createElement('span');
       valSpan.className = 'rank-val';
       valSpan.textContent = formatClearTime(e.value);
-      li.append(noSpan, nameSpan, valSpan);
+      li.append(noSpan, nameSpan);
       if(Array.isArray(e.replay) && e.replay.length > 0){
         const replayBtn = document.createElement('button');
         replayBtn.type = 'button';
@@ -1272,6 +1272,7 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
         });
         li.appendChild(replayBtn);
       }
+      li.appendChild(valSpan);
       rankingEntriesEl.appendChild(li);
     });
   }
