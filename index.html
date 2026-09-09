@@ -738,6 +738,8 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
   // ---------- Game state ----------
   let state = 'start'; // 'start' | 'intro' | 'play' | 'paused' | 'goal' | 'gameover'
   let player, camX, elapsed, lastTime, introTimer, introPhase;
+  let physicsAccumulator = 0;
+  const FIXED_DT = 1 / 120; // 物理更新を固定刻みにして、リプレイの再現精度を上げる
   let resultFocusIndex = 0; // 0 = もう一度, 1 = スタートに戻る (goal/gameover画面での選択)
   let resultInputLockUntil = 0; // この時刻までは結果画面のEnter/Space確定を無視する
   let comboPopup = null; // { text, timer, maxTimer } — 連続ジャンプ成功時に浮かぶ表示
@@ -888,13 +890,14 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
       if(introTimer <= 0){
         player.y = GROUND_BASE;
         state = 'play';
+        physicsAccumulator = 0;
       }
     }
   }
 
   function togglePause(){
     if(state === 'play'){ state = 'paused'; pauseOverlayEl.classList.remove('hidden'); }
-    else if(state === 'paused'){ state = 'play'; pauseOverlayEl.classList.add('hidden'); lastTime = performance.now(); }
+    else if(state === 'paused'){ state = 'play'; pauseOverlayEl.classList.add('hidden'); lastTime = performance.now(); physicsAccumulator = 0; }
   }
 
   function backToStart(){
@@ -1276,7 +1279,7 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
   }
   function closeRanking(){
     rankingOverlayEl.classList.add('hidden');
-    if(rankingReturnToPlay){ state = 'play'; lastTime = performance.now(); rankingReturnToPlay = false; }
+    if(rankingReturnToPlay){ state = 'play'; lastTime = performance.now(); physicsAccumulator = 0; rankingReturnToPlay = false; }
   }
 
   function showScoreSubmit(valueMs){
@@ -2135,11 +2138,24 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
   // ---------- Main loop ----------
   function loop(now){
     if(!lastTime) lastTime = now;
-    const dt = Math.min(0.033, (now - lastTime) / 1000);
+    const frameDt = Math.min(0.033, (now - lastTime) / 1000);
     lastTime = now;
 
-    if(state === 'play') updatePlay(dt);
-    else if(state === 'intro') updateIntro(dt);
+    if(state === 'play'){
+      // 物理更新を固定刻み(FIXED_DT)で進めることで、実際のフレームレートのばらつきに
+      // 依存しない再現性を確保する(リプレイの記録・再生を高精度に一致させるため)。
+      physicsAccumulator += frameDt;
+      let steps = 0;
+      while(physicsAccumulator >= FIXED_DT && state === 'play' && steps < 8){
+        updatePlay(FIXED_DT);
+        physicsAccumulator -= FIXED_DT;
+        steps++;
+      }
+      if(state !== 'play') physicsAccumulator = 0;
+    } else {
+      physicsAccumulator = 0;
+      if(state === 'intro') updateIntro(frameDt);
+    }
 
     draw(now);
     requestAnimationFrame(loop);
