@@ -1275,6 +1275,7 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
   let rankingReturnToPlay = false;
   let rankingViewStageId = 1;
   function openRanking(){
+    if(!rankingOverlayEl.classList.contains('hidden')) return; // 既に開いている間は表示中のステージ選択を維持する
     if(state === 'play'){ state = 'paused'; rankingReturnToPlay = true; }
     else { rankingReturnToPlay = false; }
     rankingViewStageId = currentStageId;
