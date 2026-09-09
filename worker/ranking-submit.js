@@ -47,7 +47,10 @@ const REPO_OWNER = 'pix-co';
 const REPO_NAME = 'running-ninniku';
 const ALLOWED_ORIGIN = 'https://pix-co.github.io';
 
-const WIKI_CATEGORIES = ['technique', 'stage1', 'stage2', 'misc', 'bug'];
+// stage2 (さむいさむいマウンテン) is not public yet - kept out of the
+// wiki's category list until it ships, so it can't be posted about even
+// via a hand-crafted request.
+const WIKI_CATEGORIES = ['technique', 'stage1', 'misc', 'bug'];
 const WIKI_TITLE_MAX = 60;
 const WIKI_BODY_MAX = 2000;
 
