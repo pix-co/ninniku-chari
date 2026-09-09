@@ -631,9 +631,9 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
   const ICE_SLIDE_ACCEL = 260;   // px/s^2 — 凍った地面(ice:true)では歯止めが効かず、乗っている間ずっと加速し続けて滑る
   const ICE_MAX_SPEED = 620;     // 氷上でも際限なく加速し続けないよう頭打ちにする速度
   const ICEBERG_SLIDE_ACCEL = 600; // px/s^2 — 大氷山(iceberg:true)は通常の氷よりめっちゃ滑る
-  const ICEBERG_MAX_SPEED = 850;   // 大氷山上の頭打ち速度(MAX_SPEEDのすぐ下まで許容)
+  const ICEBERG_MAX_SPEED = 1000;  // 大氷山上の頭打ち速度(表示速度で約180km/h、MAX_SPEEDのすぐ下まで許容)
   const AIR_ROT_SPEED = 2.6;     // rad/s bike rotation control while airborne
-  const MAX_SPEED = 900;         // px/s
+  const MAX_SPEED = 1050;        // px/s
   const JUMP_IMPULSE = 420;      // upward kick from a manual jump (px/s)
   const PIT_FALL_Y = 640;        // falling past this = missed the jump, into the pit
   const LANDING_PERFECT_DEG = 10;
