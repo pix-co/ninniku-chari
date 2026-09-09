@@ -106,9 +106,6 @@
   #rankingOverlay .overlay-card h1{ font-size:28px; }
   .overlay-card p{ margin:0; font-size:13px; font-weight:500; color: var(--ink); text-align:center; }
   .overlay-mascot{ width:90px; height:auto; align-self:center; filter: drop-shadow(0 4px 0 var(--shadow)); }
-  #mascotSpeech{ position:absolute; left:50%; top:0; transform:translate(-50%, calc(-100% - 10px)); background:#fff; border:3px solid var(--outline-dark); border-radius:14px; padding:8px 16px; font-weight:900; font-size:14px; color:var(--terracotta); box-shadow:0 3px 0 var(--outline-dark); white-space:nowrap; z-index:2; }
-  #mascotSpeech::after{ content:''; position:absolute; left:50%; bottom:-10px; transform:translateX(-50%); border-width:10px 8px 0 8px; border-style:solid; border-color:var(--outline-dark) transparent transparent transparent; }
-  #mascotSpeech::before{ content:''; position:absolute; left:50%; bottom:-6px; transform:translateX(-50%); border-width:8px 6px 0 6px; border-style:solid; border-color:#fff transparent transparent transparent; z-index:1; }
   .btn.wide{ width:100%; box-sizing:border-box; }
   .hidden{ display:none !important; }
   #scoreSubmit{ display:flex; flex-direction:column; gap:10px; }
@@ -183,7 +180,6 @@
 
       <div id="goalOverlay" class="overlay hidden">
         <div class="overlay-card">
-          <div id="mascotSpeech" class="hidden"></div>
           <img class="overlay-mascot" id="overlayMascotImg" alt="ニンニクマン">
           <h1 id="goalTitle">ゴール!</h1>
           <div id="goalStatsRow">
@@ -193,15 +189,11 @@
           <div id="scoreSubmit" class="hidden">
             <input id="nameInput" type="text" maxlength="12" placeholder="なまえ(12文字まで)">
             <button class="btn wide" id="submitScoreBtn">ランキングに登録</button>
+            <button class="btn secondary wide" id="shareScoreBtn">Xでシェア</button>
           </div>
-          <div class="btn-row">
-            <button class="btn secondary" id="shareScoreBtn">Xでシェア</button>
-            <button class="btn secondary hidden" id="saveRecordingBtn" type="button">今の走りを保存</button>
-          </div>
-          <div class="btn-row">
-            <button class="btn secondary" id="retryBtn">もう一度</button>
-            <button class="btn secondary" id="backToStartBtn">スタートに戻る</button>
-          </div>
+          <button class="btn secondary wide" id="retryBtn">もう一度</button>
+          <button class="btn secondary wide" id="backToStartBtn">スタートに戻る</button>
+          <button class="btn secondary wide hidden" id="saveRecordingBtn" type="button">今の走りを保存</button>
         </div>
       </div>
 
@@ -352,21 +344,6 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
     audio.currentTime = 0;
     audio.play().catch(() => { /* autoplay policy等で失敗しても無視 */ });
   }
-  // ランキング結果に対するニンニクマンのひとことは、専用の録音ボイスが無いので
-  // ブラウザの読み上げ機能(Web Speech API)でその場で喋らせる
-  function speakMascotLine(text, lang){
-    if(!soundEnabled) return;
-    if(!('speechSynthesis' in window)) return;
-    try{
-      window.speechSynthesis.cancel();
-      const utter = new SpeechSynthesisUtterance(text);
-      utter.lang = lang;
-      utter.pitch = 1.3;
-      utter.rate = 1.05;
-      utter.volume = voiceVolume;
-      window.speechSynthesis.speak(utter);
-    }catch(e){ /* ignore */ }
-  }
   const startOverlayEl = document.getElementById('startOverlay');
   const goalOverlayEl = document.getElementById('goalOverlay');
   const pauseOverlayEl = document.getElementById('pauseOverlay');
@@ -379,7 +356,6 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
   const tcLeanFwdEl = document.getElementById('tcLeanFwd');
   const tcHintEl = document.getElementById('tcHint');
   const overlayMascotImgEl = document.getElementById('overlayMascotImg');
-  const mascotSpeechEl = document.getElementById('mascotSpeech');
   overlayMascotImgEl.src = NINNIKU_CHAR_SRC;
   const rankingBtnEl = document.getElementById('rankingBtn');
   const rankingOverlayEl = document.getElementById('rankingOverlay');
@@ -850,6 +826,9 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
     hideScoreSubmit();
     distTotalEl.textContent = Math.round(GOAL_X / 10);
     timeValEl.textContent = '0.00';
+    speedValEl.textContent = '0';
+    distValEl.textContent = '0';
+    progressBarEl.style.width = '0%';
     recordingActive = !replayModeActive;
     recordedInputs = [];
     replayEventIdx = 0;
@@ -1203,7 +1182,6 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
   async function checkAndShowRank(valueMs, stageId){
     rankResultTextEl.textContent = '順位を確認中…';
     rankResultTextEl.classList.remove('hidden');
-    mascotSpeechEl.classList.add('hidden');
     const list = await fetchRanking(stageId);
     if(!pendingSubmit || pendingSubmit.value !== valueMs) return;
     if(list === null){
@@ -1214,14 +1192,6 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
     if(rank === -1) rank = list.length;
     rank += 1;
     rankResultTextEl.textContent = '現在の順位: ' + rank + '位';
-    if(rank <= 3){
-      mascotSpeechEl.textContent = 'Congratulations!!';
-      speakMascotLine('Congratulations!!', 'en-US');
-    } else {
-      mascotSpeechEl.textContent = 'それで満足か?';
-      speakMascotLine('それで満足か?', 'ja-JP');
-    }
-    mascotSpeechEl.classList.remove('hidden');
   }
 
   async function renderRankingList(){
@@ -1304,7 +1274,6 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
   function hideScoreSubmit(){
     pendingSubmit = null;
     scoreSubmitEl.classList.add('hidden');
-    mascotSpeechEl.classList.add('hidden');
     rankResultTextEl.classList.add('hidden');
   }
 
