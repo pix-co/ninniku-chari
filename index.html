@@ -109,6 +109,8 @@
   .btn.wide{ width:100%; box-sizing:border-box; }
   .hidden{ display:none !important; }
   #scoreSubmit{ display:flex; flex-direction:column; gap:10px; }
+  #goalStatsRow{ display:flex; justify-content:center; align-items:baseline; gap:12px; flex-wrap:wrap; }
+  #goalStatsRow:empty{ display:none; }
   .gameover-selected{ background: var(--golden) !important; color:#fff !important; box-shadow: 0 4px 0 var(--outline-dark) !important; }
   .gameover-unselected{ background: var(--panel) !important; color: var(--terracotta) !important; box-shadow: 0 4px 0 var(--outline-dark) !important; }
   #nameInput{ font-family:'Zen Maru Gothic', sans-serif; width:100%; box-sizing:border-box; padding:9px 12px; border-radius:10px; border:3px solid var(--outline-dark); font-size:14px; text-align:center; color: var(--ink); }
@@ -178,9 +180,11 @@
         <div class="overlay-card">
           <img class="overlay-mascot" id="overlayMascotImg" alt="ニンニクマン">
           <h1 id="goalTitle">ゴール!</h1>
-          <p id="goalStats"></p>
-          <div id="scoreSubmit" class="hidden">
+          <div id="goalStatsRow">
+            <p id="goalStats"></p>
             <p id="rankResultText" class="hidden"></p>
+          </div>
+          <div id="scoreSubmit" class="hidden">
             <input id="nameInput" type="text" maxlength="12" placeholder="なまえ(12文字まで)">
             <button class="btn wide" id="submitScoreBtn">ランキングに登録</button>
             <button class="btn secondary wide" id="shareScoreBtn">Xでシェア</button>
