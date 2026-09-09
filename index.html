@@ -166,7 +166,7 @@
           <div id="stageSelectPanel" class="hidden" style="display:flex; flex-direction:column; gap:10px;">
             <h1>ステージ選択</h1>
             <div class="btn-row">
-              <button class="btn" id="stage1Btn" type="button">ステージ1<br>ぽかぽかガーデン</button>
+              <button class="btn" id="stage1Btn" type="button">ステージ1<br>ニンニクガーデン</button>
               <button class="btn" id="stage2Btn" type="button">ステージ2<br>さむいさむいマウンテン</button>
             </div>
             <button class="btn secondary wide" id="modeBackBtn" type="button">戻る</button>
@@ -211,6 +211,7 @@
         <button class="btn secondary" id="pauseBtn">一時停止 [P]</button>
         <button class="btn secondary" id="restartBtn">やり直す [R]</button>
         <button class="btn secondary" id="rankingBtn">ランキング [L]</button>
+        <a class="btn secondary" id="wikiLinkBtn" href="wiki.html" target="_blank" rel="noopener" style="text-decoration:none; display:flex; align-items:center; justify-content:center;">RTA攻略Wiki</a>
         <button class="btn secondary" id="popupBtn">ポップアップ化 [O]</button>
       </div>
     </div>
@@ -468,7 +469,7 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
 
   const STAGES = {
     1: {
-      name: 'ステージ1: ぽかぽかガーデン',
+      name: 'ステージ1: ニンニクガーデン',
       goalX: 5000, // 500m (距離表示は x/10 メートル)
       terrain: [
         { x: 0,    y: GROUND_BASE },
