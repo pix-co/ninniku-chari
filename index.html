@@ -791,6 +791,7 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
     replayModeActive = false;
     replayEvents = null;
     replayEventIdx = 0;
+    heldActions.clear(); // リプレイの最後の入力状態(方向キー押しっぱなし等)を持ち越さない
     state = 'start';
     goalOverlayEl.classList.add('hidden');
     pauseOverlayEl.classList.add('hidden');
@@ -823,6 +824,7 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
   // 次のステージへ即続行したいRTAでも、これ単体で土管演出からやり直せる。
   function beginStagePlay(stageId){
     loadStage(stageId);
+    heldActions.clear();
     if(replayModeActive){
       stageLabelEl.textContent = 'リプレイ再生中 [Escで終了]' + (replayLabelText ? '  ' + replayLabelText : '');
     } else if(runMode === 'rta'){
