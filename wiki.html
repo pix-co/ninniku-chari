@@ -411,10 +411,12 @@
   const CATEGORY_LABEL = { technique:'テクニック', stage1:'ステージ1', stage2:'ステージ2', misc:'小ネタ', bug:'バグ・仕様' };
 
   function formatClearTime(ms){
-    const totalCs = Math.round(ms / 10);
-    const m = Math.floor(totalCs / 6000);
-    const s = Math.floor((totalCs % 6000) / 100);
-    const cs = totalCs % 100;
+    // ゲーム本編(index.html)のformatClearTimeと同じ切り捨て方式に合わせる。
+    // ここをMath.roundにすると1/100秒繰り上がることがあり、ランキング画面の表示と食い違う。
+    const totalMs = Math.round(ms);
+    const m = Math.floor(totalMs / 60000);
+    const s = Math.floor((totalMs % 60000) / 1000);
+    const cs = Math.floor((totalMs % 1000) / 10);
     return (m > 0 ? m + ':' + String(s).padStart(2,'0') : String(s)) + '.' + String(cs).padStart(2,'0');
   }
 
