@@ -105,6 +105,9 @@
   #rankingOverlay .overlay-card h1{ font-size:28px; }
   .overlay-card p{ margin:0; font-size:13px; font-weight:500; color: var(--ink); text-align:center; }
   .overlay-mascot{ width:90px; height:auto; align-self:center; filter: drop-shadow(0 4px 0 var(--shadow)); }
+  #mascotSpeech{ position:relative; align-self:center; background:#fff; border:3px solid var(--outline-dark); border-radius:14px; padding:8px 16px; font-weight:900; font-size:14px; color:var(--terracotta); box-shadow:0 3px 0 var(--outline-dark); margin-bottom:4px; }
+  #mascotSpeech::after{ content:''; position:absolute; left:50%; bottom:-10px; transform:translateX(-50%); border-width:10px 8px 0 8px; border-style:solid; border-color:var(--outline-dark) transparent transparent transparent; }
+  #mascotSpeech::before{ content:''; position:absolute; left:50%; bottom:-6px; transform:translateX(-50%); border-width:8px 6px 0 6px; border-style:solid; border-color:#fff transparent transparent transparent; z-index:1; }
   .btn.wide{ width:100%; box-sizing:border-box; }
   .hidden{ display:none !important; }
   #scoreSubmit{ display:flex; flex-direction:column; gap:10px; }
@@ -173,6 +176,7 @@
 
       <div id="goalOverlay" class="overlay hidden">
         <div class="overlay-card">
+          <div id="mascotSpeech" class="hidden"></div>
           <img class="overlay-mascot" id="overlayMascotImg" alt="ニンニクマン">
           <h1 id="goalTitle">ゴール!</h1>
           <p id="goalStats"></p>
@@ -287,6 +291,7 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
   const tcLeanFwdEl = document.getElementById('tcLeanFwd');
   const tcHintEl = document.getElementById('tcHint');
   const overlayMascotImgEl = document.getElementById('overlayMascotImg');
+  const mascotSpeechEl = document.getElementById('mascotSpeech');
   overlayMascotImgEl.src = NINNIKU_CHAR_SRC;
   const rankingBtnEl = document.getElementById('rankingBtn');
   const rankingOverlayEl = document.getElementById('rankingOverlay');
@@ -1036,6 +1041,7 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
   async function checkAndShowRank(valueMs, stageId){
     rankResultTextEl.textContent = '順位を確認中…';
     rankResultTextEl.classList.remove('hidden');
+    mascotSpeechEl.classList.add('hidden');
     const list = await fetchRanking(stageId);
     if(!pendingSubmit || pendingSubmit.value !== valueMs) return;
     if(list === null){
@@ -1046,6 +1052,8 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
     if(rank === -1) rank = list.length;
     rank += 1;
     rankResultTextEl.textContent = '現在の順位: ' + rank + '位';
+    mascotSpeechEl.textContent = rank <= 3 ? 'Congratulations!!' : 'それで満足か?';
+    mascotSpeechEl.classList.remove('hidden');
   }
 
   async function renderRankingList(){
@@ -1117,6 +1125,7 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
   function hideScoreSubmit(){
     pendingSubmit = null;
     scoreSubmitEl.classList.add('hidden');
+    mascotSpeechEl.classList.add('hidden');
   }
 
   submitScoreBtnEl.addEventListener('click', async () => {
