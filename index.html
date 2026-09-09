@@ -156,7 +156,7 @@
         <div class="overlay-card">
           <div id="defaultStartPanel" style="display:flex; flex-direction:column; gap:10px;">
             <h1>走れニンニクマン</h1>
-            <p>自動走行、操作不要!<br>Space/タップ: ジャンプ(穴・障害物に注意)<br>↑↓: 空中姿勢制御(着地で加減速)</p>
+            <p>自動走行、操作不要!<br>Space/タップ: ジャンプ(穴・障害物に注意)<br>←→: 空中姿勢制御(着地で加減速)</p>
             <div class="btn-row">
               <button class="btn stage-btn" id="stage1Btn" type="button">ステージ1 ニンニクガーデン</button>
               <button class="btn stage-btn" id="stage2Btn" type="button">ステージ2 さむいさむいマウンテン</button>
@@ -164,7 +164,7 @@
           </div>
           <div id="modeSelectPanel" class="hidden" style="display:flex; flex-direction:column; gap:10px;">
             <h1>走れニンニクマン</h1>
-            <p>自動走行、操作不要!<br>Space/タップ: ジャンプ(穴・障害物に注意)<br>↑↓: 空中姿勢制御(着地で加減速)<br>矢印キー: 選択 / Enter・Space: 決定</p>
+            <p>自動走行、操作不要!<br>Space/タップ: ジャンプ(穴・障害物に注意)<br>←→: 空中姿勢制御(着地で加減速)<br>矢印キー: 選択 / Enter・Space: 決定</p>
             <button class="btn wide" id="rtaModeBtn" type="button">16枚RTAモード(開発中)</button>
             <button class="btn secondary wide" id="modeBackBtn" type="button">戻る</button>
           </div>
@@ -348,8 +348,8 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
 
   // ---------- Key bindings (reused save/load pattern) ----------
   const DEFAULT_KEYS = {
-    leanForward: ['ArrowDown', 'KeyS'],
-    leanBack: ['ArrowUp', 'KeyW'],
+    leanForward: ['ArrowRight', 'KeyS'],
+    leanBack: ['ArrowLeft', 'KeyW'],
     jump: ['Space', null],
     pause: ['KeyP', null],
   };
@@ -801,8 +801,10 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
   function land(){
     const info = groundInfoAt(player.x);
     const groundAngle = info ? info.angle : 0;
-    const velAngle = Math.atan2(player.vy, player.vx);
-    let diffDeg = Math.abs((velAngle - groundAngle) * 180 / Math.PI);
+    // 判定基準はプレイヤーが空中で作った姿勢(player.angle)であって、放物線の
+    // 進行方向(velAngle)ではない。後者は重力で常に傾くため平地でも常にズレて
+    // しまい、何もしなくても着地できる平地でBADになってしまうバグがあった。
+    let diffDeg = Math.abs((player.angle - groundAngle) * 180 / Math.PI);
     diffDeg = Math.min(diffDeg, 360 - diffDeg);
 
     const landedSpeed = Math.hypot(player.vx, player.vy);
