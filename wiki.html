@@ -161,7 +161,7 @@
 <body>
 
 <div id="topbar">
-  <a class="brand" href="./index.html">
+  <a class="brand" href="#overview">
     <svg class="garlic-mark" viewBox="0 0 100 100" aria-hidden="true">
       <path d="M50 8 C56 8 58 16 54 20 C66 24 74 38 74 54 C74 74 62 90 50 90 C38 90 26 74 26 54 C26 38 34 24 46 20 C42 16 44 8 50 8 Z" fill="#F3980D" stroke="#5B4C3E" stroke-width="4"/>
       <path d="M50 20 C50 40 50 70 50 88" stroke="#5B4C3E" stroke-width="3" fill="none" opacity=".45"/>
@@ -197,6 +197,10 @@
           <div class="value" id="stat-stage1">読込中…</div>
         </div>
         <div class="stat-tile">
+          <div class="label">ステージ2 現在の1位</div>
+          <div class="value" id="stat-stage2">読込中…</div>
+        </div>
+        <div class="stat-tile">
           <div class="label">投稿数</div>
           <div class="value" id="stat-posts">読込中…</div>
         </div>
@@ -206,7 +210,7 @@
     <section id="overview">
       <div class="sec-head"><span class="sec-no">01</span><h2>概要</h2></div>
       <p>「走れニンニクマン」はニンニクマンが自動で一定速度(巡航300px/s)で走り続けるオートランナー型のアクションゲームです。プレイヤーが操作できるのは<b>ジャンプのタイミング</b>と<b>空中での姿勢(前傾・後傾)</b>だけで、アクセルやブレーキの概念はありません。だからこそ、穴やジャンプ台への入りかたひとつでタイムが大きく変わります。</p>
-      <p>現在プレイできるモードは、ステージを1本ずつ計測する<b>個別ステージモード</b>(現在公開中はステージ1「ニンニクガーデン」)と、収録ステージを通しで走る<b>16枚RTAモード</b>(ステージが増えるたびに自動でその順番を通しでプレイする、フルゲーム走のモード)の2種類です。ステージは今後も追加予定で、このWikiも公開に合わせて更新していきます。</p>
+      <p>現在プレイできるモードは、ステージを1本ずつ計測する<b>個別ステージモード</b>(現在公開中はステージ1「ニンニクガーデン」・ステージ2「さむいさむいマウンテン」)と、収録ステージを通しで走る<b>16枚RTAモード</b>(ステージが増えるたびに自動でその順番を通しでプレイする、フルゲーム走のモード)の2種類です。ステージは今後も追加予定で、このWikiも公開に合わせて更新していきます。</p>
     </section>
 
     <section id="controls">
@@ -280,6 +284,35 @@
           </div>
         </div>
       </div>
+
+      <div class="stage-card">
+        <div class="stage-top">
+          <h3>ステージ2: さむいさむいマウンテン</h3>
+          <span class="stage-meta">距離 1000m ・ 氷結地帯あり</span>
+          <span class="stage-record" id="stage2-record">1位タイム 読込中…</span>
+        </div>
+        <div class="stage-body">
+          <p>ステージ1にはなかった「氷」区間が追加され、コースも2倍の距離になる中盤〜終盤仕様のステージ。氷の上では着地角度コンボに頼らなくても地面についているだけで加速し続けるため、ここでどれだけ速度を伸ばせるかがタイムを大きく左右する。終盤にはジャンプでしか越えられない「ペンギンの親」の当たり判定もあるので油断しないこと。</p>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>区間・目印</th><th>x座標(距離換算)</th><th>メモ</th></tr></thead>
+              <tbody>
+                <tr><td>凍結区間 1</td><td class="num">x=700〜950 (70〜95m)</td><td>加速度260px/s²、頭打ち620px/s。乗っている間ジャンプせず加速を稼ぐ</td></tr>
+                <tr><td>ジャンプ台 1</td><td class="num">x=1400 (140m)</td><td>直後に穴</td></tr>
+                <tr><td>ふわふわさん</td><td class="num">x=1050,2600,6600 (105/260/660m)</td><td>踏むと大ジャンプ(通常の2.4倍)。ゲームオーバーにはならないが3段ジャンプのコンボはリセットされる</td></tr>
+                <tr><td>凍結区間 2(稜線)</td><td class="num">x=2450〜2750 (245〜275m)</td><td>登り基調の氷。速度を保ったまま抜けたい</td></tr>
+                <tr><td>ジャンプ台 2</td><td class="num">x=3150 (315m)</td><td>直後に穴</td></tr>
+                <tr><td>大氷山</td><td class="num">x=4200〜5900 (420〜590m)</td><td>加速度600px/s²・頭打ち1000px/s(約180km/h)。全区間iceberg。勢いを保って駆け上がり、頂上(x=5200)から先はブレーキなしで滑り降りる、ステージ最大の加速ポイント</td></tr>
+                <tr><td>ジャンプ台 3</td><td class="num">x=7050 (705m)</td><td>直後に穴</td></tr>
+                <tr><td>凍結区間 4</td><td class="num">x=7700〜7950 (770〜795m)</td><td>加速度260px/s²、頭打ち620px/s</td></tr>
+                <tr><td>ジャンプ台 4</td><td class="num">x=8400 (840m)</td><td>直後に穴</td></tr>
+                <tr><td>ペンギンの親</td><td class="num">x=9600 (960m)</td><td>44×44の大きめ判定。当たると即ゲームオーバーなので確実にジャンプで越える</td></tr>
+                <tr><td>ゴール</td><td class="num">x=10000 (1000m)</td><td>-</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
     </section>
 
     <section id="glossary">
@@ -324,6 +357,7 @@
             <select id="post-category">
               <option value="technique">テクニック</option>
               <option value="stage1">ステージ1</option>
+              <option value="stage2">ステージ2</option>
               <option value="misc">小ネタ</option>
               <option value="bug">バグ・仕様</option>
             </select>
@@ -355,6 +389,7 @@
         <button class="filter-chip active" data-filter="all">すべて</button>
         <button class="filter-chip" data-filter="technique">テクニック</button>
         <button class="filter-chip" data-filter="stage1">ステージ1</button>
+        <button class="filter-chip" data-filter="stage2">ステージ2</button>
         <button class="filter-chip" data-filter="misc">小ネタ</button>
         <button class="filter-chip" data-filter="bug">バグ・仕様</button>
       </div>
@@ -373,7 +408,7 @@
 <script>
 (() => {
   const WORKER_BASE = 'https://ninniku-chari.rapidpredict.workers.dev';
-  const CATEGORY_LABEL = { technique:'テクニック', stage1:'ステージ1', misc:'小ネタ', bug:'バグ・仕様' };
+  const CATEGORY_LABEL = { technique:'テクニック', stage1:'ステージ1', stage2:'ステージ2', misc:'小ネタ', bug:'バグ・仕様' };
 
   function formatClearTime(ms){
     const totalCs = Math.round(ms / 10);
@@ -406,6 +441,7 @@
   }
 
   loadRanking('./ranking-clear.json', document.getElementById('stat-stage1'), document.getElementById('stage1-record'));
+  loadRanking('./ranking-clear2.json', document.getElementById('stat-stage2'), document.getElementById('stage2-record'));
 
   // ---------- Board ----------
   const listEl = document.getElementById('post-list');

@@ -32,7 +32,7 @@ jobs:
               return m ? m[1].trim() : '';
             };
 
-            const CATEGORIES = ['technique', 'stage1', 'misc', 'bug'];
+            const CATEGORIES = ['technique', 'stage1', 'stage2', 'misc', 'bug'];
             const category = getField('category');
             const title = getField('title').replace(/[\r\n]/g, ' ').trim().slice(0, 60);
             let name = getField('name').replace(/[\r\n]/g, '').trim().slice(0, 12);
