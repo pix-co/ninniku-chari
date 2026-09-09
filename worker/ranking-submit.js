@@ -35,10 +35,24 @@
 //     be reused as-is - no need to change it.)
 // The RANKING_TOKENS KV binding is no longer used by this version and can
 // be left in place (harmless) or removed from the Worker's bindings.
+//
+// POST /wiki additionally files a community wiki-post submission (RTA
+// Info page) as a GitHub issue labeled 'wiki-post', which
+// .github/workflows/wiki.yml then appends to wiki-posts.json. This path
+// carries no anti-cheat token since it isn't a competitive score - it
+// reuses the same GITHUB_TOKEN (Issues: Read and write on this repo is
+// already sufficient, no new PAT needed).
 
 const REPO_OWNER = 'pix-co';
 const REPO_NAME = 'running-ninniku';
 const ALLOWED_ORIGIN = 'https://pix-co.github.io';
+
+// stage2 (さむいさむいマウンテン) is not public yet - kept out of the
+// wiki's category list until it ships, so it can't be posted about even
+// via a hand-crafted request.
+const WIKI_CATEGORIES = ['technique', 'stage1', 'misc', 'bug'];
+const WIKI_TITLE_MAX = 60;
+const WIKI_BODY_MAX = 2000;
 
 const TOKEN_MAX_AGE_MS = 30 * 60 * 1000;       // 一時停止等の余裕を見て30分まで有効
 const CLOCK_TOLERANCE_MS = 1500;               // タイマー精度・通信遅延の許容誤差
@@ -111,6 +125,61 @@ async function verifyToken(token, env){
   }
 }
 
+async function createGithubIssue(env, { title, body, labels }){
+  return fetch(
+    `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/issues`,
+    {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${env.GITHUB_TOKEN}`,
+        'Accept': 'application/vnd.github+json',
+        'User-Agent': 'running-ninniku-worker',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ title, body, labels }),
+    }
+  );
+}
+
+async function handleWikiSubmit(request, env){
+  let data;
+  try{
+    data = await request.json();
+  }catch(e){
+    return jsonResponse({ ok:false, error:'invalid json' }, 400);
+  }
+
+  const category = String(data.category || '');
+  const title = String(data.title || '').replace(/[\r\n]/g, ' ').trim().slice(0, WIKI_TITLE_MAX);
+  const body = String(data.body || '').trim().slice(0, WIKI_BODY_MAX);
+  let name = String(data.name || '').replace(/[\r\n]/g, '').trim().slice(0, 12);
+  if(!name) name = '名無しさん';
+
+  const validCategory = WIKI_CATEGORIES.includes(category);
+  const validTitle = title.length > 0;
+  const validBody = body.length > 0;
+
+  if(!validCategory || !validTitle || !validBody){
+    return jsonResponse({ ok:false, error:'invalid submission' }, 400);
+  }
+
+  const issueBody = 'category: ' + category + '\ntitle: ' + title + '\nname: ' + name + '\n---\n' + body;
+
+  const ghRes = await createGithubIssue(env, {
+    title: 'Wiki投稿: ' + title,
+    body: issueBody,
+    labels: ['wiki-post'],
+  });
+
+  if(!ghRes.ok){
+    const detail = await ghRes.text();
+    return jsonResponse({ ok:false, error:'github api error', detail: detail.slice(0, 300) }, 502);
+  }
+
+  const issue = await ghRes.json();
+  return jsonResponse({ ok:true, issueNumber: issue.number });
+}
+
 export default {
   async fetch(request, env){
     if(request.method === 'OPTIONS'){
@@ -124,6 +193,9 @@ export default {
     if(url.pathname === '/start'){
       const token = await issueToken(env);
       return jsonResponse({ ok:true, token });
+    }
+    if(url.pathname === '/wiki'){
+      return handleWikiSubmit(request, env);
     }
 
     let data;
@@ -159,23 +231,11 @@ export default {
 
     const body = 'mode: ' + mode + '\nvalue: ' + Math.round(value) + '\nname: ' + name;
 
-    const ghRes = await fetch(
-      `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/issues`,
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${env.GITHUB_TOKEN}`,
-          'Accept': 'application/vnd.github+json',
-          'User-Agent': 'ninniku-chari-ranking-worker',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          title: 'ランキング登録: ' + name,
-          body,
-          labels: ['ranking'],
-        }),
-      }
-    );
+    const ghRes = await createGithubIssue(env, {
+      title: 'ランキング登録: ' + name,
+      body,
+      labels: ['ranking'],
+    });
 
     if(!ghRes.ok){
       const detail = await ghRes.text();
