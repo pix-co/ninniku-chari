@@ -1063,8 +1063,12 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
   }
 
   function updatePlay(dt){
-    elapsed += dt;
+    // ライブ入力はステップとステップの間(非同期のkeydown)で発生し、その効果は
+    // 「次に走るステップ」の物理演算から反映される。リプレイでも同じ位置関係に
+    // なるよう、elapsedをまだ加算していない(=直前ステップ終了時点の)値で
+    // イベント判定してから加算する。
     applyReplayEvents();
+    elapsed += dt;
     const leanFwd = heldActions.has('leanForward');
     const leanBack = heldActions.has('leanBack');
 
