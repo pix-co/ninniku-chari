@@ -148,7 +148,7 @@
       <button class="touchBtn" id="tcLeanFwd" type="button">↓</button>
       <div id="tcHint">タップでジャンプ</div>
       <button id="soundToggleBtn" type="button" title="効果音のON/OFF">🔊</button>
-      <div id="versionLabel">v0.1.0</div>
+      <div id="versionLabel">v0.2.0</div>
 
       <div id="startOverlay" class="overlay">
         <div class="overlay-card">
@@ -192,7 +192,7 @@
 
       <div id="rankingOverlay" class="overlay hidden">
         <div class="overlay-card" style="width:920px;">
-          <h1>ランキング</h1>
+          <h1 id="rankingTitle">ランキング</h1>
           <ul id="rankingEntries"></ul>
           <button class="btn wide" id="closeRankingBtn">とじる</button>
         </div>
@@ -291,6 +291,7 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
   overlayMascotImgEl.src = NINNIKU_CHAR_SRC;
   const rankingBtnEl = document.getElementById('rankingBtn');
   const rankingOverlayEl = document.getElementById('rankingOverlay');
+  const rankingTitleEl = document.getElementById('rankingTitle');
   const rankingEntriesEl = document.getElementById('rankingEntries');
   const closeRankingBtnEl = document.getElementById('closeRankingBtn');
   const scoreSubmitEl = document.getElementById('scoreSubmit');
@@ -508,6 +509,7 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
     2: {
       name: 'ステージ2: さむいさむいマウンテン',
       goalX: 10000, // 1000m
+      starX: 9700,  // でっかい雪だるま(背景)の手前(左側)に浮かぶ星に触れたらゴール
       terrain: [
         { x: 0,    y: GROUND_BASE },
         { x: 450,  y: GROUND_BASE },                       // 平坦なスタート区間
@@ -580,7 +582,7 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
 
   let selectedStageId = 1;
   let currentStageId = 1;
-  let terrain, OBSTACLES, THEME, GOAL_X;
+  let terrain, OBSTACLES, THEME, GOAL_X, STAR_X;
   let runMode = 'single'; // 'single' | 'rta'
   let rtaStageIndex = 0;  // RTA中、STAGE_ORDER上の現在位置
   let rtaTotalElapsed = 0; // RTA中、クリア済みステージの合計タイム(秒)
@@ -592,6 +594,8 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
     OBSTACLES = s.obstacles;
     THEME = s.theme;
     GOAL_X = s.goalX;
+    // 星を配置するステージは、星に触れた時点でゴール扱いにする(星が無ければ従来通りGOAL_Xで判定)
+    STAR_X = (s.starX !== undefined) ? s.starX : s.goalX;
     stageLabelEl.textContent = s.name;
   }
   loadStage(1);
@@ -674,6 +678,7 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
       chainTimer: 0,
       lastLandTime: 0,
       pendingDustLand: false,
+      spinSpeed: 0,
     };
     camX = 0;
     elapsed = 0;
@@ -704,9 +709,7 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
   function startGame(){
     runMode = 'single';
     beginStagePlay(selectedStageId);
-    // ランキングはステージ1のみ対応(Worker側がmode:'clear'固定のため、
-    // ステージ2のクリアはランキング未登録=トークン取得も不要)
-    if(currentStageId === 1){ issueRunToken(); } else { currentRunToken = null; }
+    issueRunToken();
   }
 
   function startRTA(){
@@ -814,6 +817,7 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
     player.airborne = false;
     player.y = info ? info.y : player.y;
     player.angle = groundAngle;
+    player.spinSpeed = 0;
 
     if(diffDeg <= LANDING_PERFECT_DEG){
       // perfect landing: speed boost
@@ -891,6 +895,7 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
           player.vy = -JUMP_IMPULSE * 2.4;
           player.jumpChain = 0;
           player.chainTimer = 0;
+          player.spinSpeed = 16; // 大ジャンプ中、ニンニクマンが大回転する
           playJumpVoice(3);
           comboPopup = { text: '大ジャンプ!!', timer: 1000, maxTimer: 1000, big: true };
           return false;
@@ -965,8 +970,12 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
 
     if(player.airborne){
       player.vy += GRAVITY * dt;
-      if(leanFwd) player.angle += AIR_ROT_SPEED * dt;
-      if(leanBack) player.angle -= AIR_ROT_SPEED * dt;
+      if(player.spinSpeed){
+        player.angle += player.spinSpeed * dt;
+      } else {
+        if(leanFwd) player.angle += AIR_ROT_SPEED * dt;
+        if(leanBack) player.angle -= AIR_ROT_SPEED * dt;
+      }
       player.x += player.vx * dt;
       player.y += player.vy * dt;
       player.legPhase += dt * 6;
@@ -981,8 +990,8 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
 
     if(state === 'play') checkObstacleHit();
 
-    if(state === 'play' && player.x >= GOAL_X){
-      player.x = GOAL_X;
+    if(state === 'play' && player.x >= STAR_X){
+      player.x = STAR_X;
       finishGoal();
     }
 
@@ -990,12 +999,16 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
     speedValEl.textContent = Math.round(player.speed * 0.18); // arbitrary km/h scaling
     distValEl.textContent = Math.round(player.x / 10);
     timeValEl.textContent = (runMode === 'rta' ? rtaTotalElapsed + elapsed : elapsed).toFixed(2);
-    progressBarEl.style.width = Math.min(100, (player.x / GOAL_X) * 100) + '%';
+    progressBarEl.style.width = Math.min(100, (player.x / STAR_X) * 100) + '%';
   }
 
   // ---------- ランキング(一時的にtetris_ninniku.htmlと同じ構成で追加) ----------
-  const RANKING_FILE = 'ranking-clear.json';
-  // Cloudflare Workerを経由してGitHub Issue化し、GitHub Actionsでranking-clear.jsonを更新する。
+  // ステージごとに別のランキングファイル/モードを持つ(将来ステージが増えたら追記する)
+  const RANKING_FILES = { 1: 'ranking-clear.json', 2: 'ranking-clear2.json' };
+  const RANKING_MODES = { 1: 'clear', 2: 'clear2' };
+  function rankingFileFor(stageId){ return RANKING_FILES[stageId] || RANKING_FILES[1]; }
+  function rankingModeFor(stageId){ return RANKING_MODES[stageId] || RANKING_MODES[1]; }
+  // Cloudflare Workerを経由してGitHub Issue化し、GitHub Actionsでranking-clear*.jsonを更新する。
   // Worker未デプロイの間は登録に失敗するだけで、閲覧(ランキング表示)は空一覧として動作する。
   const RANKING_SUBMIT_URL = 'https://ninniku-chari.rapidpredict.workers.dev/';
   const RANKING_START_URL = RANKING_SUBMIT_URL + 'start';
@@ -1021,19 +1034,19 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
     return (m > 0 ? m + ':' + String(s).padStart(2, '0') : s) + '.' + String(cs).padStart(2, '0');
   }
 
-  async function fetchRanking(){
+  async function fetchRanking(stageId){
     try{
-      const res = await fetch(RANKING_FILE, { cache: 'no-store' });
+      const res = await fetch(rankingFileFor(stageId), { cache: 'no-store' });
       if(!res.ok) return null;
       const list = await res.json();
       return Array.isArray(list) ? list : [];
     }catch(e){ return null; }
   }
 
-  async function checkAndShowRank(valueMs){
+  async function checkAndShowRank(valueMs, stageId){
     rankResultTextEl.textContent = '順位を確認中…';
     rankResultTextEl.classList.remove('hidden');
-    const list = await fetchRanking();
+    const list = await fetchRanking(stageId);
     if(!pendingSubmit || pendingSubmit.value !== valueMs) return;
     if(list === null){
       rankResultTextEl.classList.add('hidden');
@@ -1046,12 +1059,13 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
   }
 
   async function renderRankingList(){
+    rankingTitleEl.textContent = 'ランキング(' + STAGES[currentStageId].name + ')';
     rankingEntriesEl.innerHTML = '';
     const loadingLi = document.createElement('li');
     loadingLi.textContent = '読み込み中…';
     loadingLi.className = 'rank-empty';
     rankingEntriesEl.appendChild(loadingLi);
-    const list = await fetchRanking();
+    const list = await fetchRanking(currentStageId);
     rankingEntriesEl.innerHTML = '';
     if(list === null){
       const li = document.createElement('li');
@@ -1097,7 +1111,7 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
   }
 
   function showScoreSubmit(valueMs){
-    pendingSubmit = { value: valueMs };
+    pendingSubmit = { value: valueMs, stageId: currentStageId };
     let savedName = '';
     try{ savedName = localStorage.getItem('ninniku-chari-playername') || ''; }catch(e){ /* ignore */ }
     nameInputEl.value = savedName;
@@ -1116,7 +1130,7 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
     let name = nameInputEl.value.replace(/[\r\n]/g, '').trim().slice(0, 12);
     if(!name) name = '名無しさん';
     try{ localStorage.setItem('ninniku-chari-playername', name); }catch(e){ /* ignore */ }
-    const { value } = pendingSubmit;
+    const { value, stageId } = pendingSubmit;
     if(!currentRunToken){
       submitScoreBtnEl.textContent = '登録に失敗しました(プレイ確認トークンがありません)';
       return;
@@ -1127,7 +1141,7 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
       const res = await fetch(RANKING_SUBMIT_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: 'clear', value, name, token: currentRunToken }),
+        body: JSON.stringify({ mode: rankingModeFor(stageId), value, name, token: currentRunToken }),
       });
       const data = await res.json().catch(() => null);
       if(res.ok && data && data.ok){
@@ -1144,7 +1158,8 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
 
   shareScoreBtnEl.addEventListener('click', () => {
     if(!pendingSubmit) return;
-    const text = '走れニンニクマンで500mを ' + formatClearTime(pendingSubmit.value) + ' でクリアしました！ #走れニンニクマン';
+    const distM = Math.round((STAGES[pendingSubmit.stageId] || STAGES[1]).goalX / 10);
+    const text = '走れニンニクマンで' + distM + 'mを ' + formatClearTime(pendingSubmit.value) + ' でクリアしました！ #走れニンニクマン';
     const url = location.href;
     const intentUrl = 'https://twitter.com/intent/tweet?text=' + encodeURIComponent(text) + '&url=' + encodeURIComponent(url);
     window.open(intentUrl, '_blank', 'noopener,noreferrer');
@@ -1178,15 +1193,9 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
     state = 'goal';
     const finalMs = elapsed * 1000;
     goalStatsEl.textContent = 'タイム: ' + formatClearTime(finalMs);
-    if(currentStageId === 1){
-      goalTitleEl.textContent = 'ゴール!';
-      showScoreSubmit(finalMs);
-      checkAndShowRank(finalMs);
-    } else {
-      // ステージ2はランキング未対応(Worker側がステージ1のmode:'clear'固定のため)
-      goalTitleEl.textContent = 'ステージ2 クリア!';
-      hideScoreSubmit();
-    }
+    goalTitleEl.textContent = (currentStageId === 1) ? 'ゴール!' : 'ステージ' + currentStageId + ' クリア!';
+    showScoreSubmit(finalMs);
+    checkAndShowRank(finalMs, currentStageId);
     resultFocusIndex = 0;
     updateResultFocus();
     resultInputLockUntil = performance.now() + 600;
@@ -1514,64 +1523,98 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
       ctx.fill();
     }
 
-    // ゴール付近の氷の塔(ステージ1の城の代わり)
+    // ゴール地点の目印: でっかい雪だるま(ステージ1の城の代わり、背景装飾)
     const towerWorldX = GOAL_X - 190;
     const cx = towerWorldX - camX;
-    const baseY = GROUND_BASE - 40;
-    ctx.fillStyle = '#eaf6fc';
-    ctx.strokeStyle = '#9cc7de';
-    ctx.lineWidth = 2;
-    ctx.fillRect(cx - 55, baseY - 90, 110, 90);
-    ctx.strokeRect(cx - 55, baseY - 90, 110, 90);
-    [-78, 56].forEach((dx) => {
-      ctx.fillRect(cx + dx, baseY - 120, 22, 120);
-      ctx.strokeRect(cx + dx, baseY - 120, 22, 120);
-      ctx.fillStyle = '#5fc9ef';
-      ctx.beginPath();
-      ctx.moveTo(cx + dx - 4, baseY - 120);
-      ctx.lineTo(cx + dx + 11, baseY - 150);
-      ctx.lineTo(cx + dx + 26, baseY - 120);
-      ctx.closePath();
-      ctx.fill();
-      ctx.fillStyle = '#eaf6fc';
-    });
-    ctx.fillRect(cx - 16, baseY - 160, 32, 160);
-    ctx.strokeRect(cx - 16, baseY - 160, 32, 160);
-    ctx.fillStyle = '#5fc9ef';
+    const towerGroundInfo = groundInfoAt(towerWorldX);
+    const baseY = towerGroundInfo ? towerGroundInfo.y : GROUND_BASE;
+    const bodyR = 72, headR = 46;
+    const bodyCy = baseY - bodyR;
+    const headCy = bodyCy - bodyR * 0.85 - headR * 0.85;
+    // 腕(木の枝、片手だけ)+ 先端に手袋
+    ctx.strokeStyle = '#6b4a2f';
+    ctx.lineWidth = 5;
+    ctx.lineCap = 'round';
+    const armBaseX = cx + bodyR * 0.75, armBaseY = bodyCy - bodyR * 0.1;
+    const armEndX = cx + bodyR * 1.5, armEndY = bodyCy - bodyR * 0.55;
     ctx.beginPath();
-    ctx.moveTo(cx - 20, baseY - 160);
-    ctx.lineTo(cx, baseY - 195);
-    ctx.lineTo(cx + 20, baseY - 160);
-    ctx.closePath();
-    ctx.fill();
-    // 旗
-    ctx.strokeStyle = '#8fa6b3';
-    ctx.beginPath();
-    ctx.moveTo(cx, baseY - 195);
-    ctx.lineTo(cx, baseY - 212);
+    ctx.moveTo(armBaseX, armBaseY);
+    ctx.lineTo(armEndX, armEndY);
     ctx.stroke();
-    ctx.fillStyle = '#eaf6fc';
+    ctx.fillStyle = '#d43f3f';
+    ctx.strokeStyle = '#a52a2a';
+    ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(cx, baseY - 212);
-    ctx.lineTo(cx + 16, baseY - 206);
-    ctx.lineTo(cx, baseY - 200);
+    ctx.ellipse(armEndX + 7, armEndY - 5, 13, 10, Math.atan2(armEndY - armBaseY, armEndX - armBaseX), 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = '#ffffff';
+    ctx.strokeStyle = '#9cc7de';
+    ctx.lineWidth = 3;
+    for(const [cy, r] of [[bodyCy, bodyR], [headCy, headR]]){
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    }
+    ctx.fillStyle = '#2b2b2b';
+    ctx.beginPath();
+    ctx.arc(cx - headR * 0.35, headCy - headR * 0.1, headR * 0.13, 0, Math.PI * 2);
+    ctx.arc(cx + headR * 0.35, headCy - headR * 0.1, headR * 0.13, 0, Math.PI * 2);
+    ctx.arc(cx, bodyCy - bodyR * 0.35, bodyR * 0.11, 0, Math.PI * 2);
+    ctx.arc(cx, bodyCy + bodyR * 0.15, bodyR * 0.11, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#e2882f';
+    ctx.beginPath();
+    ctx.moveTo(cx, headCy + headR * 0.05);
+    ctx.lineTo(cx + headR * 0.6, headCy + headR * 0.2);
+    ctx.lineTo(cx, headCy + headR * 0.32);
     ctx.closePath();
     ctx.fill();
-    // 軒先の氷柱(つらら)
-    ctx.fillStyle = '#cdeffd';
-    for(let ix = -50; ix <= 50; ix += 20){
-      ctx.beginPath();
-      ctx.moveTo(cx + ix - 5, baseY - 90);
-      ctx.lineTo(cx + ix + 5, baseY - 90);
-      ctx.lineTo(cx + ix, baseY - 90 + 14);
-      ctx.closePath();
-      ctx.fill();
-    }
-    // 円窓
-    ctx.fillStyle = '#5fc9ef';
+  }
+
+  function drawGoalStar(now){
+    // ジャンプで届く高さに浮かぶゴールの星。触れる(STAR_Xに到達する)とクリア
+    if(STAR_X === GOAL_X) return;
+    if(state !== 'play' && state !== 'intro') return;
+    const info = groundInfoAt(STAR_X);
+    const groundY = info ? info.y : GROUND_BASE;
+    const cx = STAR_X - camX;
+    if(cx < -40 || cx > 1000) return;
+    const bob = Math.sin(now / 260) * 6;
+    const spin = now / 900;
+    const cy = groundY - 70 + bob;
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.save();
+    ctx.rotate(spin);
+    ctx.fillStyle = '#ffd94a';
+    ctx.strokeStyle = '#e0a112';
+    ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.arc(cx, baseY - 110, 10, 0, Math.PI * 2);
+    for(let i = 0; i < 5; i++){
+      const outerAng = -Math.PI / 2 + (Math.PI * 2 * i) / 5;
+      const innerAng = outerAng + Math.PI / 5;
+      const ox = Math.cos(outerAng) * 26, oy = Math.sin(outerAng) * 26;
+      const ix = Math.cos(innerAng) * 11, iy = Math.sin(innerAng) * 11;
+      if(i === 0) ctx.moveTo(ox, oy); else ctx.lineTo(ox, oy);
+      ctx.lineTo(ix, iy);
+    }
+    ctx.closePath();
     ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+    // マリオ64のスター風の目(星の回転に関わらず正面を向いたまま)
+    ctx.fillStyle = '#1c1c1c';
+    ctx.strokeStyle = '#d8d8d8';
+    ctx.lineWidth = 1;
+    for(const dx of [-5, 5]){
+      ctx.beginPath();
+      ctx.ellipse(dx, 1, 2.6, 6, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    }
+    ctx.restore();
   }
 
   function drawSnowfall(now){
@@ -1780,7 +1823,15 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
     const sy = player.y;
     ctx.save();
     ctx.translate(sx, sy);
-    ctx.rotate(player.angle);
+    if(player.spinSpeed){
+      // 大回転中は足元ではなく、ニンニクマン自身の体の中心を軸に回す
+      const pivotY = -20;
+      ctx.translate(0, pivotY);
+      ctx.rotate(player.angle);
+      ctx.translate(0, -pivotY);
+    } else {
+      ctx.rotate(player.angle);
+    }
 
     drawLegs(player.legPhase);
 
@@ -1835,6 +1886,7 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
     if(THEME.backdrop === 'mountain') drawMountainBackdrop(); else drawCastleBackdrop();
     drawGround();
     drawObstacles();
+    drawGoalStar(now);
     drawPipe();
     drawChaserPenguin(now);
     drawDustPuffs();

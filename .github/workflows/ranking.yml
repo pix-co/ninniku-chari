@@ -34,7 +34,8 @@ jobs:
             if (!name) name = '名無しさん';
 
             const value = Number(rawValue);
-            const validMode = mode === 'clear';
+            const FILE_BY_MODE = { clear: 'ranking-clear.json', clear2: 'ranking-clear2.json' };
+            const validMode = Object.prototype.hasOwnProperty.call(FILE_BY_MODE, mode);
             const validValue = Number.isFinite(value) && value >= 0 && value <= 3600000;
 
             if (!validMode || !validValue) {
@@ -53,7 +54,7 @@ jobs:
               return;
             }
 
-            const file = 'ranking-clear.json';
+            const file = FILE_BY_MODE[mode];
             let list = [];
             try {
               list = JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -98,7 +99,7 @@ jobs:
         run: |
           git config user.name "ranking-bot"
           git config user.email "actions@github.com"
-          git add ranking-clear.json
+          git add ranking-clear.json ranking-clear2.json
           if git diff --cached --quiet; then
             echo "No ranking changes to commit"
           else

@@ -1,7 +1,8 @@
 // Cloudflare Worker: authenticates on the player's behalf and files a
 // ranking submission as a GitHub issue, so the accompanying
-// .github/workflows/ranking.yml action can validate it and update
-// ranking-clear.json exactly as before (same pattern as tetris-ninniku).
+// .github/workflows/ranking.yml action can validate it and update the
+// right ranking-clear*.json file for the stage (mode 'clear' -> stage1,
+// 'clear2' -> stage2; same pattern as tetris-ninniku).
 //
 // Anti-cheat: a run must first fetch a signed start token from POST /start
 // (issued at the moment the player presses Start), then include that token
@@ -41,7 +42,11 @@ const ALLOWED_ORIGIN = 'https://pix-co.github.io';
 
 const TOKEN_MAX_AGE_MS = 30 * 60 * 1000;       // 一時停止等の余裕を見て30分まで有効
 const CLOCK_TOLERANCE_MS = 1500;               // タイマー精度・通信遅延の許容誤差
-const MIN_CLEAR_MS = 3000;                     // 理論上の最速(約5.6秒)より十分短い絶対下限
+// モードごとの理論上の最速タイムより十分短い絶対下限(ステージが増えたら追記する)
+const MIN_MS_BY_MODE = {
+  clear: 3000,   // ステージ1(500m)
+  clear2: 4000,  // ステージ2(1000m、氷山などの滑走区間込みでも下限としては十分厳しい)
+};
 
 function corsHeaders(){
   return {
@@ -133,8 +138,8 @@ export default {
     let name = String(data.name || '').replace(/[\r\n]/g, '').trim().slice(0, 12);
     if(!name) name = '名無しさん';
 
-    const validMode = mode === 'clear';
-    const validValue = Number.isFinite(value) && value >= MIN_CLEAR_MS && value <= 3600000;
+    const validMode = Object.prototype.hasOwnProperty.call(MIN_MS_BY_MODE, mode);
+    const validValue = validMode && Number.isFinite(value) && value >= MIN_MS_BY_MODE[mode] && value <= 3600000;
 
     if(!validMode || !validValue){
       return jsonResponse({ ok:false, error:'invalid submission' }, 400);
