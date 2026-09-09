@@ -280,6 +280,20 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
     audio.currentTime = 0;
     audio.play().catch(() => { /* autoplay policy等で失敗しても無視 */ });
   }
+  // ランキング結果に対するニンニクマンのひとことは、専用の録音ボイスが無いので
+  // ブラウザの読み上げ機能(Web Speech API)でその場で喋らせる
+  function speakMascotLine(text, lang){
+    if(!soundEnabled) return;
+    if(!('speechSynthesis' in window)) return;
+    try{
+      window.speechSynthesis.cancel();
+      const utter = new SpeechSynthesisUtterance(text);
+      utter.lang = lang;
+      utter.pitch = 1.3;
+      utter.rate = 1.05;
+      window.speechSynthesis.speak(utter);
+    }catch(e){ /* ignore */ }
+  }
   const startOverlayEl = document.getElementById('startOverlay');
   const goalOverlayEl = document.getElementById('goalOverlay');
   const pauseOverlayEl = document.getElementById('pauseOverlay');
@@ -1052,7 +1066,13 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
     if(rank === -1) rank = list.length;
     rank += 1;
     rankResultTextEl.textContent = '現在の順位: ' + rank + '位';
-    mascotSpeechEl.textContent = rank <= 3 ? 'Congratulations!!' : 'それで満足か?';
+    if(rank <= 3){
+      mascotSpeechEl.textContent = 'Congratulations!!';
+      speakMascotLine('Congratulations!!', 'en-US');
+    } else {
+      mascotSpeechEl.textContent = 'それで満足か?';
+      speakMascotLine('それで満足か?', 'ja-JP');
+    }
     mascotSpeechEl.classList.remove('hidden');
   }
 
