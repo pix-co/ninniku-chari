@@ -1,0 +1,104 @@
+name: Update wiki posts from issue
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  update-wiki:
+    if: contains(github.event.issue.labels.*.name, 'wiki-post')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Parse submission and append wiki post
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const MAX_POSTS = 500;
+            const raw = context.payload.issue.body || '';
+
+            const sepIndex = raw.indexOf('\n---\n');
+            const header = sepIndex === -1 ? raw : raw.slice(0, sepIndex);
+            const bodyText = (sepIndex === -1 ? '' : raw.slice(sepIndex + 5)).trim();
+
+            const getField = (key) => {
+              const m = header.match(new RegExp('^' + key + ':\\s*(.*)$', 'mi'));
+              return m ? m[1].trim() : '';
+            };
+
+            const CATEGORIES = ['technique', 'stage1', 'stage2', 'misc', 'bug'];
+            const category = getField('category');
+            const title = getField('title').replace(/[\r\n]/g, ' ').trim().slice(0, 60);
+            let name = getField('name').replace(/[\r\n]/g, '').trim().slice(0, 12);
+            if (!name) name = '名無しさん';
+
+            const validCategory = CATEGORIES.includes(category);
+            const validTitle = title.length > 0;
+            const validBody = bodyText.length > 0 && bodyText.length <= 2000;
+
+            if (!validCategory || !validTitle || !validBody) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: '内容を読み取れませんでした。Wikiページの投稿フォームから送り直してください。',
+              });
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                state: 'closed',
+              });
+              return;
+            }
+
+            const file = 'wiki-posts.json';
+            let list = [];
+            try {
+              list = JSON.parse(fs.readFileSync(file, 'utf8'));
+            } catch (e) {
+              list = [];
+            }
+            if (!Array.isArray(list)) list = [];
+
+            list.unshift({
+              id: 'p' + Date.now(),
+              category,
+              title,
+              body: bodyText,
+              name,
+              date: new Date().toISOString().slice(0, 10),
+            });
+            list = list.slice(0, MAX_POSTS);
+            fs.writeFileSync(file, JSON.stringify(list, null, 2) + '\n');
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: '投稿を反映しました。Wikiページへの掲載まで数分お待ちください。',
+            });
+            await github.rest.issues.update({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              state: 'closed',
+            });
+
+      - name: Commit wiki update
+        run: |
+          git config user.name "wiki-bot"
+          git config user.email "actions@github.com"
+          git add wiki-posts.json
+          if git diff --cached --quiet; then
+            echo "No wiki changes to commit"
+          else
+            git commit -m "Add wiki post from issue #${{ github.event.issue.number }}"
+            git push
+          fi

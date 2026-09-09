@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>走れニンニクマン RTA Info</title>
+<meta name="description" content="走れニンニクマンのRTA(リアルタイムアタック)向け攻略Wiki。テクニック・ステージ攻略・用語集に加え、誰でも投稿できる攻略情報掲示板。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700;900&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --cream:#FBF3E7;
+    --panel:#FFFFFF;
+    --ink:#4A3B2D;
+    --ink-soft:#6B5A48;
+    --outline:#8C7C6E;
+    --outline-dark:#5B4C3E;
+    --golden:#F3980D;
+    --terracotta:#C8481A;
+    --ivory:#FBEFD9;
+    --taupe:#B7A499;
+    --shadow: rgba(74,59,45,0.18);
+    --line: rgba(140,124,110,0.28);
+    --gold-rank:#C9971F;
+    --silver-rank:#8C7C6E;
+    --bronze-rank:#B7792F;
+  }
+  *{box-sizing:border-box;}
+  html{ scroll-behavior:smooth; }
+  html,body{ margin:0; padding:0; background:var(--cream); color:var(--ink); }
+  body{
+    font-family:'Zen Kaku Gothic New','Zen Maru Gothic',sans-serif;
+    background-image:
+      radial-gradient(circle at 6% 8%, rgba(243,152,13,0.09) 0, transparent 38%),
+      radial-gradient(circle at 96% 92%, rgba(200,72,26,0.07) 0, transparent 42%);
+    background-attachment: fixed;
+    line-height:1.8;
+    -webkit-tap-highlight-color: transparent;
+  }
+  h1,h2,h3,.brand,.btn,button,nav a{ font-family:'Zen Maru Gothic',sans-serif; }
+  a{ color:var(--terracotta); }
+  ::selection{ background: var(--golden); color:#fff; }
+
+  /* ---------- Top bar ---------- */
+  #topbar{
+    position:sticky; top:0; z-index:20;
+    display:flex; align-items:center; gap:12px;
+    padding:10px 20px;
+    background:rgba(251,243,231,0.92);
+    backdrop-filter: blur(6px);
+    border-bottom:3px solid var(--outline-dark);
+  }
+  .brand{ display:flex; align-items:center; gap:8px; font-weight:900; color:var(--terracotta); font-size:17px; white-space:nowrap; text-decoration:none; }
+  .garlic-mark{ width:26px; height:26px; flex-shrink:0; filter: drop-shadow(0 2px 0 var(--shadow)); }
+  #topbar .spacer{ flex:1; }
+  #topbar .btn{ padding:8px 14px; font-size:13px; width:auto; }
+
+  /* ---------- Layout ---------- */
+  #layout{ max-width:1080px; margin:0 auto; padding:28px 20px 80px; display:grid; grid-template-columns:190px minmax(0,1fr); gap:36px; align-items:start; }
+  @media (max-width:780px){ #layout{ grid-template-columns:1fr; } #toc{ display:none; } }
+
+  #toc{ position:sticky; top:70px; display:flex; flex-direction:column; gap:2px; }
+  #toc .toc-label{ font-size:11px; font-weight:700; color:var(--taupe); letter-spacing:.08em; margin-bottom:6px; }
+  #toc a{ text-decoration:none; color:var(--ink-soft); font-size:13px; font-weight:700; padding:7px 10px; border-radius:8px; }
+  #toc a:hover{ background:var(--ivory); color:var(--terracotta); }
+
+  main{ min-width:0; }
+
+  /* ---------- Hero ---------- */
+  .hero{ padding:6px 0 22px; }
+  .eyebrow{ font-size:12px; font-weight:700; color:var(--golden); letter-spacing:.1em; margin:0 0 6px; }
+  .hero h1{ margin:0 0 10px; font-size:clamp(26px,4.4vw,38px); font-weight:900; color:var(--terracotta); letter-spacing:.01em; text-wrap:balance; }
+  .hero p{ margin:0; color:var(--ink-soft); font-size:15px; max-width:62ch; }
+
+  .stat-strip{ display:flex; gap:10px; flex-wrap:wrap; margin-top:18px; }
+  .stat-tile{ background:var(--panel); border:3px solid var(--outline-dark); border-radius:14px; padding:10px 16px; box-shadow:0 4px 0 var(--shadow); min-width:150px; }
+  .stat-tile .label{ font-size:11px; font-weight:700; color:var(--taupe); }
+  .stat-tile .value{ font-size:19px; font-weight:900; color:var(--terracotta); font-variant-numeric:tabular-nums; }
+  .stat-tile .value small{ font-size:12px; font-weight:700; color:var(--ink-soft); }
+
+  /* ---------- Sections ---------- */
+  section{ padding:34px 0; border-top:1px solid var(--line); scroll-margin-top:66px; }
+  section:first-of-type{ border-top:none; }
+  .sec-head{ display:flex; align-items:baseline; gap:10px; margin-bottom:14px; }
+  .sec-no{ font-size:12px; font-weight:900; color:var(--golden); font-variant-numeric:tabular-nums; }
+  h2{ margin:0; font-size:22px; font-weight:900; color:var(--terracotta); }
+  h3{ margin:0 0 6px; font-size:15px; font-weight:700; color:var(--ink); }
+  section > p{ color:var(--ink-soft); max-width:66ch; }
+
+  table{ width:100%; border-collapse:collapse; font-size:13.5px; }
+  th,td{ text-align:left; padding:9px 10px; border-bottom:1px solid var(--line); }
+  th{ color:var(--taupe); font-weight:700; font-size:12px; }
+  td.num{ font-variant-numeric:tabular-nums; color:var(--ink-soft); }
+  .table-wrap{ overflow-x:auto; border:1px solid var(--line); border-radius:12px; background:var(--panel); }
+  .table-wrap table{ margin:0; }
+  .table-wrap th,.table-wrap td{ padding:10px 14px; }
+
+  kbd{ font-family:'Zen Maru Gothic',sans-serif; background:var(--ivory); border:2px solid var(--outline-dark); border-bottom-width:3px; border-radius:6px; padding:1px 7px; font-size:12px; font-weight:700; color:var(--ink); }
+
+  .tech-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:14px; }
+  .card{ background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:16px 18px; }
+  .tech-card{ border-left:5px solid var(--golden); }
+  .tech-card .num{ font-size:11px; font-weight:900; color:var(--golden); }
+  .tech-card p{ margin:6px 0 0; font-size:13.5px; color:var(--ink-soft); }
+
+  .stage-card{ border:2px solid var(--outline-dark); border-radius:16px; overflow:hidden; margin-bottom:18px; background:var(--panel); }
+  .stage-card .stage-top{ display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 18px; background:var(--ivory); flex-wrap:wrap; }
+  .stage-card .stage-top h3{ margin:0; font-size:17px; color:var(--terracotta); }
+  .stage-meta{ font-size:12px; font-weight:700; color:var(--ink-soft); }
+  .stage-record{ font-size:13px; font-weight:700; color:var(--terracotta); font-variant-numeric:tabular-nums; }
+  .stage-body{ padding:16px 18px; }
+  .stage-body p{ margin:0 0 12px; font-size:13.5px; color:var(--ink-soft); }
+  .tag{ display:inline-block; font-size:11px; font-weight:700; padding:2px 9px; border-radius:999px; background:var(--ivory); color:var(--terracotta); }
+  .tag.warn{ background:#FBE3D9; color:#B4441C; }
+
+  dl.glossary{ margin:0; display:grid; gap:14px; }
+  dl.glossary > div{ border-bottom:1px solid var(--line); padding-bottom:12px; }
+  dl.glossary dt{ font-weight:900; color:var(--ink); font-size:14px; }
+  dl.glossary dt .en{ font-weight:700; color:var(--taupe); font-size:11px; margin-left:6px; }
+  dl.glossary dd{ margin:4px 0 0; color:var(--ink-soft); font-size:13.5px; }
+
+  /* ---------- Board ---------- */
+  #post-form{ background:var(--panel); border:2px solid var(--outline-dark); border-radius:16px; padding:18px 20px; box-shadow:0 5px 0 var(--shadow); margin-bottom:22px; }
+  #post-form .row{ display:flex; gap:10px; flex-wrap:wrap; margin-bottom:10px; }
+  #post-form label{ display:block; font-size:11px; font-weight:700; color:var(--taupe); margin-bottom:4px; }
+  #post-form select, #post-form input[type=text], #post-form textarea{
+    font-family:'Zen Kaku Gothic New',sans-serif; width:100%; box-sizing:border-box;
+    padding:9px 12px; border-radius:10px; border:2px solid var(--outline-dark);
+    font-size:14px; color:var(--ink); background:#fff;
+  }
+  #post-form textarea{ resize:vertical; min-height:90px; font-size:14px; line-height:1.6; }
+  #post-form .col{ flex:1; min-width:150px; }
+  #post-form .actions{ display:flex; align-items:center; gap:12px; margin-top:4px; }
+  .btn{ background:var(--golden); border:3px solid var(--outline-dark); color:#fff; font-weight:700; border-radius:12px; padding:11px 18px; font-size:14px; box-shadow:0 4px 0 var(--outline-dark); cursor:pointer; transition:transform .05s ease; }
+  .btn:active{ transform:translateY(3px); box-shadow:0 1px 0 var(--outline-dark); }
+  .btn.secondary{ background:var(--panel); color:var(--terracotta); }
+  .btn:disabled{ opacity:.6; cursor:default; }
+  #post-status{ font-size:12.5px; font-weight:700; color:var(--ink-soft); }
+  #post-status.ok{ color:#3a7d3a; }
+  #post-status.err{ color:var(--terracotta); }
+  .hp-field{ position:absolute; left:-9999px; top:-9999px; }
+
+  .board-toolbar{ display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px; }
+  .filter-chip{ font-size:12.5px; font-weight:700; padding:6px 13px; border-radius:999px; border:2px solid var(--outline-dark); background:var(--panel); color:var(--ink-soft); cursor:pointer; }
+  .filter-chip.active{ background:var(--terracotta); color:#fff; border-color:var(--terracotta); }
+
+  #post-list{ display:flex; flex-direction:column; gap:12px; }
+  .post-card{ background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:14px 18px; }
+  .post-card .post-head{ display:flex; align-items:center; gap:10px; margin-bottom:6px; flex-wrap:wrap; }
+  .post-card h3{ margin:0; font-size:14.5px; color:var(--ink); flex:1; min-width:0; }
+  .post-card .meta{ font-size:11.5px; color:var(--taupe); font-weight:700; white-space:nowrap; }
+  .post-card .body{ font-size:13.5px; color:var(--ink-soft); white-space:pre-wrap; margin:0; }
+  .post-card.pending{ border-style:dashed; opacity:.85; }
+  #post-empty{ color:var(--taupe); font-size:13px; padding:18px; text-align:center; border:1px dashed var(--line); border-radius:12px; }
+
+  footer{ max-width:1080px; margin:0 auto; padding:20px 20px 40px; color:var(--taupe); font-size:12px; display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; border-top:1px solid var(--line); }
+  footer a{ color:var(--ink-soft); }
+</style>
+</head>
+<body>
+
+<div id="topbar">
+  <a class="brand" href="./index.html">
+    <svg class="garlic-mark" viewBox="0 0 100 100" aria-hidden="true">
+      <path d="M50 8 C56 8 58 16 54 20 C66 24 74 38 74 54 C74 74 62 90 50 90 C38 90 26 74 26 54 C26 38 34 24 46 20 C42 16 44 8 50 8 Z" fill="#F3980D" stroke="#5B4C3E" stroke-width="4"/>
+      <path d="M50 20 C50 40 50 70 50 88" stroke="#5B4C3E" stroke-width="3" fill="none" opacity=".45"/>
+      <path d="M38 26 C34 42 34 68 42 84" stroke="#5B4C3E" stroke-width="3" fill="none" opacity=".3"/>
+      <path d="M62 26 C66 42 66 68 58 84" stroke="#5B4C3E" stroke-width="3" fill="none" opacity=".3"/>
+    </svg>
+    走れニンニクマン RTA Info
+  </a>
+  <div class="spacer"></div>
+  <a class="btn secondary" href="./index.html">ゲームで遊ぶ</a>
+  <a class="btn" href="#board">投稿する</a>
+</div>
+
+<div id="layout">
+  <nav id="toc">
+    <div class="toc-label">CONTENTS</div>
+    <a href="#overview">概要</a>
+    <a href="#controls">操作方法</a>
+    <a href="#techniques">テクニック</a>
+    <a href="#stages">ステージ攻略</a>
+    <a href="#glossary">用語集</a>
+    <a href="#board">みんなの攻略情報</a>
+  </nav>
+
+  <main>
+    <div class="hero">
+      <p class="eyebrow">HASHIRE NINNIKU-MAN — RTA WIKI</p>
+      <h1>走れニンニクマンのRTAを、みんなで速くしよう。</h1>
+      <p>自動で走り続けるニンニクマンを操り、ジャンプのタイミングと空中姿勢だけでタイムを縮める1本道ランアクション「走れニンニクマン」。このページは有志によるRTA(リアルタイムアタック)攻略情報のまとめです。テクニックやルート、記録はページ下部の掲示板からログイン不要で誰でも投稿できます。</p>
+      <div class="stat-strip">
+        <div class="stat-tile">
+          <div class="label">ステージ1 現在の1位</div>
+          <div class="value" id="stat-stage1">読込中…</div>
+        </div>
+        <div class="stat-tile">
+          <div class="label">ステージ2 現在の1位</div>
+          <div class="value" id="stat-stage2">読込中…</div>
+        </div>
+        <div class="stat-tile">
+          <div class="label">投稿数</div>
+          <div class="value" id="stat-posts">読込中…</div>
+        </div>
+      </div>
+    </div>
+
+    <section id="overview">
+      <div class="sec-head"><span class="sec-no">01</span><h2>概要</h2></div>
+      <p>「走れニンニクマン」はニンニクマンが自動で一定速度(巡航300px/s)で走り続けるオートランナー型のアクションゲームです。プレイヤーが操作できるのは<b>ジャンプのタイミング</b>と<b>空中での姿勢(前傾・後傾)</b>だけで、アクセルやブレーキの概念はありません。だからこそ、穴やジャンプ台への入りかたひとつでタイムが大きく変わります。</p>
+      <p>現在プレイできるモードは、ステージを1本ずつ計測する<b>個別ステージモード</b>(ステージ1「ぽかぽかガーデン」/ステージ2「さむいさむいマウンテン」)と、収録ステージを通しで走る<b>16枚RTAモード</b>(ステージが増えるたびに自動でその順番を通しでプレイする、フルゲーム走のモード)の2種類です。</p>
+    </section>
+
+    <section id="controls">
+      <div class="sec-head"><span class="sec-no">02</span><h2>操作方法</h2></div>
+      <p>自動走行・操作不要。操作するのはジャンプと空中姿勢のみです。</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>キー</th><th>効果</th></tr></thead>
+          <tbody>
+            <tr><td><kbd>Space</kbd> / タップ</td><td>ジャンプ。穴や障害物の直前で入力する</td></tr>
+            <tr><td><kbd>↑</kbd> / <kbd>W</kbd></td><td>空中で後傾姿勢。着地角度を調整する</td></tr>
+            <tr><td><kbd>↓</kbd></td><td>空中で前傾姿勢。着地角度を調整する</td></tr>
+            <tr><td><kbd>矢印キー</kbd></td><td>スタート画面などでの選択</td></tr>
+            <tr><td><kbd>Enter</kbd> / <kbd>Space</kbd></td><td>決定</td></tr>
+            <tr><td><kbd>P</kbd></td><td>一時停止</td></tr>
+            <tr><td><kbd>R</kbd></td><td>やり直す</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="techniques">
+      <div class="sec-head"><span class="sec-no">03</span><h2>テクニック</h2></div>
+      <p>タイムを縮めるための基本テクニック。数値はゲーム内の実際の設定値です。</p>
+      <div class="tech-grid">
+        <div class="card tech-card">
+          <div class="num">TECH 1</div>
+          <h3>着地角度コンボ</h3>
+          <p>着地角度が±10°以内なら「パーフェクト」、±30°以内なら「OK」判定。パーフェクト着地を連続で決めるたびに速度+5%が乗り、8連続で頭打ちの+40%まで伸びる。↑↓で常に浅い角度で着地することを意識する。</p>
+        </div>
+        <div class="card tech-card">
+          <div class="num">TECH 2</div>
+          <h3>3段階ジャンプ(マリオ64式)</h3>
+          <p>着地から300ms以内に再ジャンプすると段数が上がり、ジャンプ力が1→1.3→1.7倍に。3段目成功で速度に1.6倍のブーストがかかる。着地後80ms以内の再ジャンプは足元の砂煙が出ない「最速フレーム」の目安になる。</p>
+        </div>
+        <div class="card tech-card">
+          <div class="num">TECH 3</div>
+          <h3>氷・氷山スライド(ステージ2)</h3>
+          <p>凍った地面ではブレーキが効かず加速し続け、通常の氷は620px/sで頭打ち。大氷山はさらに滑りやすく、最大1000px/s(表示速度で約180km/h)まで伸びる。氷山区間はできるだけ長く乗り続けるのが短縮の鍵。</p>
+        </div>
+        <div class="card tech-card">
+          <div class="num">TECH 4</div>
+          <h3>ジャンプ台の活用</h3>
+          <p>各ステージに複数設置。踏むと登り坂ジャンプになり、直後の穴を安全に越えられる。ステージ2には踏むと大ジャンプできる「ふわふわ」台もある。位置は下のステージ攻略を参照。</p>
+        </div>
+        <div class="card tech-card">
+          <div class="num">TECH 5</div>
+          <h3>終盤の親ペンギン回避(ステージ2)</h3>
+          <p>終盤、背負っている子ペンギンの親が接近してくる。接触するとゲームオーバーになるため、基本ルートを外さず通過するのが安全。</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="stages">
+      <div class="sec-head"><span class="sec-no">04</span><h2>ステージ攻略</h2></div>
+      <p>現在の各ステージ1位タイムはゲーム内ランキングと連動して自動表示されます。ジャンプ台のx座標はゲーム内の実データです。</p>
+
+      <div class="stage-card">
+        <div class="stage-top">
+          <h3>ステージ1: ぽかぽかガーデン</h3>
+          <span class="stage-meta">距離 500m ・ 通常ゴール判定</span>
+          <span class="stage-record" id="stage1-record">1位タイム 読込中…</span>
+        </div>
+        <div class="stage-body">
+          <p>平坦なスタート区間から始まり、ジャンプ台を3箇所経由して平坦なゴール前区間へ。氷やジャンプ段数ブーストを使う場面は少なく、着地角度コンボを安定して繋ぐことがそのままタイムに直結する、基礎練習向けのステージ。</p>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>目印</th><th>x座標(距離換算)</th><th>メモ</th></tr></thead>
+              <tbody>
+                <tr><td>ジャンプ台 1</td><td class="num">x=1350 (135m)</td><td>直後に穴</td></tr>
+                <tr><td>ジャンプ台 2</td><td class="num">x=2900 (290m)</td><td>直後に穴</td></tr>
+                <tr><td>ジャンプ台 3</td><td class="num">x=3900 (390m)</td><td>直後に穴</td></tr>
+                <tr><td>ゴール</td><td class="num">x=5000 (500m)</td><td>-</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="stage-card">
+        <div class="stage-top">
+          <h3>ステージ2: さむいさむいマウンテン</h3>
+          <span class="stage-meta">距離 1000m ・ 星に触れてゴール</span>
+          <span class="stage-record" id="stage2-record">1位タイム 読込中…</span>
+        </div>
+        <div class="stage-body">
+          <p>ニンニクマンが子ペンギンを背負って走る雪山ステージ。氷・大氷山による高速スライド区間が中盤〜終盤に配置されており、ステージ1よりテクニック依存度が高い。終盤には親ペンギンの接近イベント(<span class="tag warn">当たるとゲームオーバー</span>)がある。</p>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>目印</th><th>x座標(距離換算)</th><th>メモ</th></tr></thead>
+              <tbody>
+                <tr><td>ふわふわ台(大ジャンプ)</td><td class="num">x=1050 (105m)</td><td>踏むと大ジャンプ</td></tr>
+                <tr><td>ジャンプ台 1</td><td class="num">x=1400 (140m)</td><td>直後に穴</td></tr>
+                <tr><td>ジャンプ台 2</td><td class="num">x=3150 (315m)</td><td>直後に穴</td></tr>
+                <tr><td>ジャンプ台 3</td><td class="num">x=7050 (705m)</td><td>直後に穴</td></tr>
+                <tr><td>ジャンプ台 4</td><td class="num">x=8400 (840m)</td><td>直後に穴</td></tr>
+                <tr><td>親ペンギン接近</td><td class="num">x=9600 (960m)</td><td><span class="tag warn">接触注意</span></td></tr>
+                <tr><td>ゴール(星)</td><td class="num">x=9700 (970m)</td><td>-</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="glossary">
+      <div class="sec-head"><span class="sec-no">05</span><h2>用語集</h2></div>
+      <dl class="glossary">
+        <div>
+          <dt>RTA <span class="en">Real Time Attack</span></dt>
+          <dd>ロードや操作を含めた実際の経過時間でクリアタイムを競う遊び方。</dd>
+        </div>
+        <div>
+          <dt>IL <span class="en">Individual Level</span></dt>
+          <dd>ステージ単体のタイムを競う走り。このゲームでは「個別ステージモード」が該当する。</dd>
+        </div>
+        <div>
+          <dt>フルゲーム(オールクリア)</dt>
+          <dd>収録ステージすべてを通しで走るモード。このゲームでは「16枚RTAモード」の名称で、ステージが追加されるたびに自動で通しの対象になる。</dd>
+        </div>
+        <div>
+          <dt>PB <span class="en">Personal Best</span></dt>
+          <dd>自己ベストタイムのこと。</dd>
+        </div>
+        <div>
+          <dt>フレームパーフェクト</dt>
+          <dd>1フレーム単位の猶予しかない入力タイミング。このゲームでは着地後80ms以内の再ジャンプ(3段ジャンプの「最速フレーム」)がこれに近い。</dd>
+        </div>
+        <div>
+          <dt>検証(けんしょう)</dt>
+          <dd>動画などをもとに記録の正当性をコミュニティで確認すること。</dd>
+        </div>
+      </dl>
+    </section>
+
+    <section id="board">
+      <div class="sec-head"><span class="sec-no">06</span><h2>みんなの攻略情報</h2></div>
+      <p>テクニック・ルート・小ネタ・バグ報告など、気づいたことは何でも投稿してください。ログインは不要です。投稿はGitHub Issueとして記録され、内容を確認のうえ数分〜で一覧に反映されます(まれに反映されない場合があります)。</p>
+
+      <form id="post-form">
+        <input class="hp-field" type="text" id="hp-website" name="website" tabindex="-1" autocomplete="off">
+        <div class="row">
+          <div class="col" style="flex:0 0 170px;">
+            <label for="post-category">カテゴリ</label>
+            <select id="post-category">
+              <option value="technique">テクニック</option>
+              <option value="stage1">ステージ1</option>
+              <option value="stage2">ステージ2</option>
+              <option value="misc">小ネタ</option>
+              <option value="bug">バグ・仕様</option>
+            </select>
+          </div>
+          <div class="col">
+            <label for="post-title">タイトル(60文字まで)</label>
+            <input type="text" id="post-title" maxlength="60" placeholder="例: ジャンプ台2の直前で3段目を出す方法">
+          </div>
+        </div>
+        <div class="row">
+          <div class="col" style="flex:1 1 100%;">
+            <label for="post-body">内容(2000文字まで)</label>
+            <textarea id="post-body" maxlength="2000" placeholder="具体的な位置や手順、うまくいったコツなどを書いてください"></textarea>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col" style="flex:0 0 200px;">
+            <label for="post-name">なまえ(任意・12文字まで)</label>
+            <input type="text" id="post-name" maxlength="12" placeholder="名無しさん">
+          </div>
+        </div>
+        <div class="actions">
+          <button type="submit" class="btn" id="post-submit">投稿する</button>
+          <span id="post-status"></span>
+        </div>
+      </form>
+
+      <div class="board-toolbar" id="filter-bar">
+        <button class="filter-chip active" data-filter="all">すべて</button>
+        <button class="filter-chip" data-filter="technique">テクニック</button>
+        <button class="filter-chip" data-filter="stage1">ステージ1</button>
+        <button class="filter-chip" data-filter="stage2">ステージ2</button>
+        <button class="filter-chip" data-filter="misc">小ネタ</button>
+        <button class="filter-chip" data-filter="bug">バグ・仕様</button>
+      </div>
+
+      <div id="post-list"></div>
+      <div id="post-empty" class="hidden">まだ投稿がありません。最初の攻略情報を投稿してみましょう。</div>
+    </section>
+  </main>
+</div>
+
+<footer>
+  <span>走れニンニクマン RTA Info ・ 有志による非公式攻略Wiki</span>
+  <span><a href="./index.html">ゲーム本編に戻る</a></span>
+</footer>
+
+<script>
+(() => {
+  const WORKER_BASE = 'https://ninniku-chari.rapidpredict.workers.dev';
+  const CATEGORY_LABEL = { technique:'テクニック', stage1:'ステージ1', stage2:'ステージ2', misc:'小ネタ', bug:'バグ・仕様' };
+
+  function formatClearTime(ms){
+    const totalCs = Math.round(ms / 10);
+    const m = Math.floor(totalCs / 6000);
+    const s = Math.floor((totalCs % 6000) / 100);
+    const cs = totalCs % 100;
+    return (m > 0 ? m + ':' + String(s).padStart(2,'0') : String(s)) + '.' + String(cs).padStart(2,'0');
+  }
+
+  function setStat(el, top){
+    if(!top){ el.textContent = '記録なし'; return; }
+    el.innerHTML = '';
+    el.append(formatClearTime(top.value) + ' ');
+    const small = document.createElement('small');
+    small.textContent = top.name;
+    el.append(small);
+  }
+
+  async function loadRanking(file, statEl, recordEl){
+    try{
+      const res = await fetch(file, { cache:'no-store' });
+      const list = await res.json();
+      const top = Array.isArray(list) && list.length ? list[0] : null;
+      setStat(statEl, top);
+      recordEl.textContent = top ? ('1位タイム ' + formatClearTime(top.value) + '(' + top.name + ')') : '1位タイム 記録なし';
+    }catch(e){
+      statEl.textContent = '取得失敗';
+      recordEl.textContent = '1位タイム 取得失敗';
+    }
+  }
+
+  loadRanking('./ranking-clear.json', document.getElementById('stat-stage1'), document.getElementById('stage1-record'));
+  loadRanking('./ranking-clear2.json', document.getElementById('stat-stage2'), document.getElementById('stage2-record'));
+
+  // ---------- Board ----------
+  const listEl = document.getElementById('post-list');
+  const emptyEl = document.getElementById('post-empty');
+  const statPostsEl = document.getElementById('stat-posts');
+  let posts = [];
+  let currentFilter = 'all';
+  let pendingPosts = [];
+
+  function renderPosts(){
+    const merged = pendingPosts.concat(posts);
+    const filtered = currentFilter === 'all' ? merged : merged.filter(p => p.category === currentFilter);
+    listEl.innerHTML = '';
+    emptyEl.classList.toggle('hidden', filtered.length > 0);
+    for(const p of filtered){
+      const card = document.createElement('div');
+      card.className = 'post-card' + (p.pending ? ' pending' : '');
+
+      const head = document.createElement('div');
+      head.className = 'post-head';
+
+      const tag = document.createElement('span');
+      tag.className = 'tag';
+      tag.textContent = CATEGORY_LABEL[p.category] || p.category;
+      head.append(tag);
+
+      const h3 = document.createElement('h3');
+      h3.textContent = p.title;
+      head.append(h3);
+
+      const meta = document.createElement('span');
+      meta.className = 'meta';
+      meta.textContent = (p.pending ? '反映待ち ・ ' : '') + (p.name || '名無しさん') + ' ・ ' + (p.date || '');
+      head.append(meta);
+
+      const body = document.createElement('p');
+      body.className = 'body';
+      body.textContent = p.body;
+
+      card.append(head, body);
+      listEl.append(card);
+    }
+  }
+
+  async function loadPosts(){
+    try{
+      const res = await fetch('./wiki-posts.json', { cache:'no-store' });
+      const data = await res.json();
+      posts = Array.isArray(data) ? data : [];
+    }catch(e){
+      posts = [];
+    }
+    statPostsEl.textContent = posts.length + '件';
+    renderPosts();
+  }
+  loadPosts();
+
+  document.getElementById('filter-bar').addEventListener('click', (e) => {
+    const btn = e.target.closest('.filter-chip');
+    if(!btn) return;
+    document.querySelectorAll('.filter-chip').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentFilter = btn.dataset.filter;
+    renderPosts();
+  });
+
+  const form = document.getElementById('post-form');
+  const statusEl = document.getElementById('post-status');
+  const submitBtn = document.getElementById('post-submit');
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if(document.getElementById('hp-website').value){ return; } // honeypot
+
+    const category = document.getElementById('post-category').value;
+    const title = document.getElementById('post-title').value.trim();
+    const body = document.getElementById('post-body').value.trim();
+    const name = document.getElementById('post-name').value.trim() || '名無しさん';
+
+    if(!title || !body){
+      statusEl.textContent = 'タイトルと内容を入力してください';
+      statusEl.className = 'err';
+      return;
+    }
+
+    submitBtn.disabled = true;
+    statusEl.textContent = '投稿中…';
+    statusEl.className = '';
+
+    try{
+      const res = await fetch(WORKER_BASE + '/wiki', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ category, title, body, name }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if(res.ok && data.ok){
+        statusEl.textContent = '投稿しました！一覧への反映まで数分お待ちください。';
+        statusEl.className = 'ok';
+        pendingPosts.unshift({ category, title, body, name, date: new Date().toISOString().slice(0,10), pending:true });
+        renderPosts();
+        form.reset();
+      } else {
+        statusEl.textContent = '投稿に失敗しました。もう一度お試しください';
+        statusEl.className = 'err';
+      }
+    }catch(err){
+      statusEl.textContent = '投稿に失敗しました(通信エラー)';
+      statusEl.className = 'err';
+    }
+    submitBtn.disabled = false;
+  });
+})();
+</script>
+</body>
+</html>
