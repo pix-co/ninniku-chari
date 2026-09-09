@@ -786,7 +786,7 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
     hideScoreSubmit();
     resultFocusIndex = 0;
     updateResultFocus();
-    resultInputLockUntil = performance.now() + 600;
+    resultInputLockUntil = performance.now() + 1000;
     goalOverlayEl.classList.remove('hidden');
     crashFlashEl.style.transition = 'none';
     crashFlashEl.style.opacity = '0.5';
@@ -1180,7 +1180,7 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
       hideScoreSubmit();
       resultFocusIndex = 0;
       updateResultFocus();
-      resultInputLockUntil = performance.now() + 600;
+      resultInputLockUntil = performance.now() + 1000;
       goalOverlayEl.classList.remove('hidden');
       return;
     }
@@ -1193,7 +1193,7 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
     checkAndShowRank(finalMs, currentStageId);
     resultFocusIndex = 0;
     updateResultFocus();
-    resultInputLockUntil = performance.now() + 600;
+    resultInputLockUntil = performance.now() + 1000;
     goalOverlayEl.classList.remove('hidden');
   }
 
