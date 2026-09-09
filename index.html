@@ -801,10 +801,8 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
   function land(){
     const info = groundInfoAt(player.x);
     const groundAngle = info ? info.angle : 0;
-    // 判定基準はプレイヤーが空中で作った姿勢(player.angle)であって、放物線の
-    // 進行方向(velAngle)ではない。後者は重力で常に傾くため平地でも常にズレて
-    // しまい、何もしなくても着地できる平地でBADになってしまうバグがあった。
-    let diffDeg = Math.abs((player.angle - groundAngle) * 180 / Math.PI);
+    const velAngle = Math.atan2(player.vy, player.vx);
+    let diffDeg = Math.abs((velAngle - groundAngle) * 180 / Math.PI);
     diffDeg = Math.min(diffDeg, 360 - diffDeg);
 
     const landedSpeed = Math.hypot(player.vx, player.vy);
