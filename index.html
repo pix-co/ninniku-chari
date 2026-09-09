@@ -112,6 +112,10 @@
   .btn.wide{ width:100%; box-sizing:border-box; }
   .hidden{ display:none !important; }
   #scoreSubmit{ display:flex; flex-direction:column; gap:10px; }
+  #goalStatsRow{ display:flex; justify-content:center; align-items:center; gap:8px; flex-wrap:wrap; }
+  #goalStatsRow:empty{ display:none; }
+  .stat-chip{ margin:0; background: var(--panel); border:2px solid var(--outline-dark); border-radius:10px; padding:5px 12px; }
+  .stat-chip:empty{ display:none; }
   .gameover-selected{ background: var(--golden) !important; color:#fff !important; box-shadow: 0 4px 0 var(--outline-dark) !important; }
   .gameover-unselected{ background: var(--panel) !important; color: var(--terracotta) !important; box-shadow: 0 4px 0 var(--outline-dark) !important; }
   #nameInput{ font-family:'Zen Maru Gothic', sans-serif; width:100%; box-sizing:border-box; padding:9px 12px; border-radius:10px; border:3px solid var(--outline-dark); font-size:14px; text-align:center; color: var(--ink); }
@@ -182,16 +186,22 @@
           <div id="mascotSpeech" class="hidden"></div>
           <img class="overlay-mascot" id="overlayMascotImg" alt="ニンニクマン">
           <h1 id="goalTitle">ゴール!</h1>
-          <p id="goalStats"></p>
+          <div id="goalStatsRow">
+            <p id="goalStats" class="stat-chip"></p>
+            <p id="rankResultText" class="stat-chip hidden"></p>
+          </div>
           <div id="scoreSubmit" class="hidden">
-            <p id="rankResultText" class="hidden"></p>
             <input id="nameInput" type="text" maxlength="12" placeholder="なまえ(12文字まで)">
             <button class="btn wide" id="submitScoreBtn">ランキングに登録</button>
-            <button class="btn secondary wide" id="shareScoreBtn">Xでシェア</button>
           </div>
-          <button class="btn secondary wide" id="retryBtn">もう一度</button>
-          <button class="btn secondary wide" id="backToStartBtn">スタートに戻る</button>
-          <button class="btn secondary wide hidden" id="saveRecordingBtn" type="button">今の走りを保存</button>
+          <div class="btn-row">
+            <button class="btn secondary" id="shareScoreBtn">Xでシェア</button>
+            <button class="btn secondary hidden" id="saveRecordingBtn" type="button">今の走りを保存</button>
+          </div>
+          <div class="btn-row">
+            <button class="btn secondary" id="retryBtn">もう一度</button>
+            <button class="btn secondary" id="backToStartBtn">スタートに戻る</button>
+          </div>
         </div>
       </div>
 
@@ -1294,6 +1304,7 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
     pendingSubmit = null;
     scoreSubmitEl.classList.add('hidden');
     mascotSpeechEl.classList.add('hidden');
+    rankResultTextEl.classList.add('hidden');
   }
 
   submitScoreBtnEl.addEventListener('click', async () => {
