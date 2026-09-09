@@ -33,6 +33,24 @@ jobs:
             let name = getField('name').replace(/[\r\n]/g, '').trim().slice(0, 12);
             if (!name) name = '名無しさん';
 
+            // リプレイ(ジャンプ・空中姿勢の入力列)は任意項目。壊れていても
+            // ランキング登録自体は失敗させず、リプレイ無しとして扱うだけにする。
+            const rawReplay = getField('replay');
+            let replay = null;
+            if (rawReplay) {
+              try {
+                const parsed = JSON.parse(rawReplay);
+                const validEvent = (ev) =>
+                  Array.isArray(ev) && ev.length >= 2 && ev.length <= 3 &&
+                  typeof ev[0] === 'number' && Number.isFinite(ev[0]) && ev[0] >= 0 && ev[0] <= 3600 &&
+                  (ev[1] === 'j' || ev[1] === 'lf' || ev[1] === 'lb') &&
+                  (ev.length < 3 || ev[2] === 0 || ev[2] === 1);
+                if (Array.isArray(parsed) && parsed.length > 0 && parsed.length <= 1000 && parsed.every(validEvent)) {
+                  replay = parsed;
+                }
+              } catch (e) { replay = null; }
+            }
+
             const value = Number(rawValue);
             const FILE_BY_MODE = { clear: 'ranking-clear.json', clear2: 'ranking-clear2.json' };
             const validMode = Object.prototype.hasOwnProperty.call(FILE_BY_MODE, mode);
@@ -70,11 +88,9 @@ jobs:
 
             let comment;
             if (madeIt) {
-              list.splice(rank, 0, {
-                name,
-                value,
-                date: new Date().toISOString().slice(0, 10),
-              });
+              const entry = { name, value, date: new Date().toISOString().slice(0, 10) };
+              if (replay) entry.replay = replay;
+              list.splice(rank, 0, entry);
               list = list.slice(0, RANK_SIZE);
               fs.writeFileSync(file, JSON.stringify(list, null, 2) + '\n');
               comment = 'ランキング ' + (rank + 1) + ' 位にランクインしました！反映まで数分お待ちください。';

@@ -126,6 +126,7 @@
   .rank-no.rank-bronze{ color:#B7792F; font-size:16px; }
   .rank-name{ flex:1; text-align:left; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:700; color: var(--ink); }
   .rank-val{ font-weight:900; color: var(--terracotta); flex-shrink:0; font-variant-numeric: tabular-nums; }
+  .rank-replay-btn{ flex-shrink:0; padding:4px 10px; font-size:12px; width:auto; }
   .rank-empty{ justify-content:center; text-align:center; color: var(--taupe); padding:14px 0; }
   #progressWrap{ position:absolute; bottom:8px; left:8px; right:8px; height:8px; background:rgba(0,0,0,.2); border-radius:6px; overflow:hidden; }
   #progressBar{ height:100%; width:0%; background:linear-gradient(90deg,var(--golden),var(--terracotta)); }
@@ -190,7 +191,7 @@
           </div>
           <button class="btn secondary wide" id="retryBtn">もう一度</button>
           <button class="btn secondary wide" id="backToStartBtn">スタートに戻る</button>
-          <button class="btn secondary wide hidden" id="saveRecordingBtn" type="button">今の走りの録画を保存</button>
+          <button class="btn secondary wide hidden" id="saveRecordingBtn" type="button">今の走りを保存</button>
         </div>
       </div>
 
@@ -471,6 +472,10 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
   let debugComboTriggered = false;
   window.addEventListener('keydown', (e) => {
     if(e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+    if(replayModeActive){
+      if(e.code === 'Escape'){ e.preventDefault(); exitReplay(); }
+      return;
+    }
     if(e.code === 'KeyD' || e.code === 'KeyF'){
       debugKeysHeld.add(e.code);
       if(debugKeysHeld.has('KeyD') && debugKeysHeld.has('KeyF') && !debugComboTriggered){
@@ -491,7 +496,7 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
       return;
     }
     const action = actionForCode(e.code);
-    if(action){ e.preventDefault(); heldActions.add(action); }
+    if(action){ e.preventDefault(); setHeldAction(action, true); }
     if(action === 'pause'){ togglePause(); }
     if(action === 'jump' && !e.repeat){ tryJump(); }
     if(e.code === 'Escape' && state !== 'start'){ backToStart(); }
@@ -519,8 +524,9 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
     }
   });
   window.addEventListener('keyup', (e) => {
+    if(replayModeActive) return;
     const action = actionForCode(e.code);
-    if(action){ heldActions.delete(action); }
+    if(action){ setHeldAction(action, false); }
     if(e.code === 'KeyD' || e.code === 'KeyF'){
       debugKeysHeld.delete(e.code);
       if(!debugKeysHeld.has('KeyD') || !debugKeysHeld.has('KeyF')) debugComboTriggered = false;
@@ -738,6 +744,60 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
   let comboPopup = null; // { text, timer, maxTimer } — 連続ジャンプ成功時に浮かぶ表示
   let dustPuffs = []; // 最速で3段ジャンプを繋げられなかった時に足元へ出す砂煙
 
+  // ---------- 入力リプレイ(ジャンプ・空中姿勢の入力だけを記録して再生する) ----------
+  // ゲームは常に一定速度で自動走行するため、プレイヤーの入力はジャンプの
+  // タイミングと空中姿勢(leanForward/leanBack)の押下区間だけ。この2種類だけ
+  // 記録しておけば、同じステージ・同じ物理演算で再生するだけで元の走りを
+  // 完全に再現できる(動画と違ってごく小さいデータで済む)。
+  // イベント形式: [elapsed秒, 'j'] = ジャンプ / [elapsed秒, 'lf'|'lb', 0|1] = 押す/離す
+  let recordingActive = false;
+  let recordedInputs = [];
+  let replayModeActive = false;
+  let replayEvents = null;
+  let replayEventIdx = 0;
+  let replayLabelText = '';
+
+  function recordInputEvent(ev){
+    if(recordingActive) recordedInputs.push(ev);
+  }
+  function setHeldAction(action, on){
+    if(on) heldActions.add(action); else heldActions.delete(action);
+    if(action === 'leanForward') recordInputEvent([elapsed, 'lf', on ? 1 : 0]);
+    else if(action === 'leanBack') recordInputEvent([elapsed, 'lb', on ? 1 : 0]);
+  }
+  function applyReplayEvents(){
+    if(!replayModeActive || !replayEvents) return;
+    while(replayEventIdx < replayEvents.length && replayEvents[replayEventIdx][0] <= elapsed){
+      const ev = replayEvents[replayEventIdx];
+      if(ev[1] === 'j') tryJump();
+      else if(ev[1] === 'lf'){ if(ev[2]) heldActions.add('leanForward'); else heldActions.delete('leanForward'); }
+      else if(ev[1] === 'lb'){ if(ev[2]) heldActions.add('leanBack'); else heldActions.delete('leanBack'); }
+      replayEventIdx++;
+    }
+  }
+  function startReplay(stageId, events, label){
+    if(!Array.isArray(events) || events.length === 0) return;
+    rankingOverlayEl.classList.add('hidden');
+    replayModeActive = true;
+    replayEvents = events;
+    replayEventIdx = 0;
+    replayLabelText = label || '';
+    runMode = 'single';
+    currentRunToken = null;
+    beginStagePlay(stageId);
+  }
+  function exitReplay(){
+    replayModeActive = false;
+    replayEvents = null;
+    replayEventIdx = 0;
+    state = 'start';
+    goalOverlayEl.classList.add('hidden');
+    pauseOverlayEl.classList.add('hidden');
+    startOverlayEl.classList.remove('hidden');
+    showDefaultStart();
+    openRanking();
+  }
+
   function resetPlayer(){
     player = {
       x: PIPE_X, y: GROUND_BASE, angle: 0, // 土管の位置から出てくるので、開始xを土管に合わせる
@@ -762,8 +822,12 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
   // 次のステージへ即続行したいRTAでも、これ単体で土管演出からやり直せる。
   function beginStagePlay(stageId){
     loadStage(stageId);
-    if(runMode === 'rta'){
+    if(replayModeActive){
+      stageLabelEl.textContent = 'リプレイ再生中 [Escで終了]' + (replayLabelText ? '  ' + replayLabelText : '');
+    } else if(runMode === 'rta'){
       stageLabelEl.textContent = (rtaStageIndex + 1) + '/' + STAGE_ORDER.length + '  ' + STAGES[stageId].name;
+    } else {
+      stageLabelEl.textContent = '';
     }
     resetPlayer();
     player.y = PIPE_TOP + INTRO_HIDDEN_DROP; // 土管の中、フチより下の見えない位置からスタート
@@ -776,7 +840,10 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
     hideScoreSubmit();
     distTotalEl.textContent = Math.round(GOAL_X / 10);
     timeValEl.textContent = '0.00';
-    startRecording();
+    recordingActive = !replayModeActive;
+    recordedInputs = [];
+    replayEventIdx = 0;
+    if(!replayModeActive) startRecording();
   }
 
   function startGame(){
@@ -864,6 +931,7 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
   }
 
   function gameOver(reason){
+    if(replayModeActive){ exitReplay(); return; }
     stopRecording();
     state = 'gameover';
     goalTitleEl.textContent = (runMode === 'rta')
@@ -933,6 +1001,7 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
 
   function tryJump(){
     if(state !== 'play' || player.airborne) return;
+    recordInputEvent([elapsed, 'j']);
     const info = groundInfoAt(player.x);
     const angle = info ? info.angle : 0;
 
@@ -990,6 +1059,7 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
 
   function updatePlay(dt){
     elapsed += dt;
+    applyReplayEvents();
     const leanFwd = heldActions.has('leanForward');
     const leanBack = heldActions.has('leanBack');
 
@@ -1182,6 +1252,16 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
       valSpan.className = 'rank-val';
       valSpan.textContent = formatClearTime(e.value);
       li.append(noSpan, nameSpan, valSpan);
+      if(Array.isArray(e.replay) && e.replay.length > 0){
+        const replayBtn = document.createElement('button');
+        replayBtn.type = 'button';
+        replayBtn.className = 'btn secondary rank-replay-btn';
+        replayBtn.textContent = '▶ リプレイ';
+        replayBtn.addEventListener('click', () => {
+          startReplay(viewStageId, e.replay, (e.name || '名無しさん') + ' ' + formatClearTime(e.value));
+        });
+        li.appendChild(replayBtn);
+      }
       rankingEntriesEl.appendChild(li);
     });
   }
@@ -1201,7 +1281,7 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
   }
 
   function showScoreSubmit(valueMs){
-    pendingSubmit = { value: valueMs, stageId: currentStageId };
+    pendingSubmit = { value: valueMs, stageId: currentStageId, replay: recordedInputs.slice() };
     let savedName = '';
     try{ savedName = localStorage.getItem('ninniku-chari-playername') || ''; }catch(e){ /* ignore */ }
     nameInputEl.value = savedName;
@@ -1221,7 +1301,7 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
     let name = nameInputEl.value.replace(/[\r\n]/g, '').trim().slice(0, 12);
     if(!name) name = '名無しさん';
     try{ localStorage.setItem('ninniku-chari-playername', name); }catch(e){ /* ignore */ }
-    const { value, stageId } = pendingSubmit;
+    const { value, stageId, replay } = pendingSubmit;
     if(!currentRunToken){
       submitScoreBtnEl.textContent = '登録に失敗しました(プレイ確認トークンがありません)';
       return;
@@ -1232,7 +1312,7 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
       const res = await fetch(RANKING_SUBMIT_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: rankingModeFor(stageId), value, name, token: currentRunToken }),
+        body: JSON.stringify({ mode: rankingModeFor(stageId), value, name, token: currentRunToken, replay }),
       });
       const data = await res.json().catch(() => null);
       if(res.ok && data && data.ok){
@@ -1257,12 +1337,13 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
     window.open(intentUrl, '_blank', 'noopener,noreferrer');
   });
 
-  rankingBtnEl.addEventListener('click', openRanking);
+  rankingBtnEl.addEventListener('click', () => { if(replayModeActive){ exitReplay(); return; } openRanking(); });
   closeRankingBtnEl.addEventListener('click', closeRanking);
   document.getElementById('pauseBtn').addEventListener('click', togglePause);
-  document.getElementById('restartBtn').addEventListener('click', () => retryCurrent());
+  document.getElementById('restartBtn').addEventListener('click', () => { if(replayModeActive){ exitReplay(); return; } retryCurrent(); });
 
   function finishGoal(){
+    if(replayModeActive){ exitReplay(); return; }
     if(runMode === 'rta'){
       rtaTotalElapsed += elapsed;
       rtaStageIndex++;
@@ -2101,8 +2182,8 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
     tcHintEl.classList.add('show');
   }
   function bindHoldButton(el, action){
-    const press = (e) => { e.preventDefault(); heldActions.add(action); };
-    const release = (e) => { if(e) e.preventDefault(); heldActions.delete(action); };
+    const press = (e) => { if(replayModeActive) return; e.preventDefault(); setHeldAction(action, true); };
+    const release = (e) => { if(replayModeActive) return; if(e) e.preventDefault(); setHeldAction(action, false); };
     el.addEventListener('touchstart', press, { passive: false });
     el.addEventListener('touchend', release);
     el.addEventListener('touchcancel', release);
@@ -2111,6 +2192,7 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
   bindHoldButton(tcLeanFwdEl, 'leanForward');
   canvas.addEventListener('touchstart', (e) => {
     e.preventDefault();
+    if(replayModeActive) return;
     tryJump();
   }, { passive: false });
 

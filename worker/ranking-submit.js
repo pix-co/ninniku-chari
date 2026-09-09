@@ -59,6 +59,23 @@ const MIN_MS_BY_MODE = {
   clear2: 4000,  // ステージ2(1000m、氷山などの滑走区間込みでも下限としては十分厳しい)
 };
 
+// リプレイ(ジャンプ・空中姿勢の入力だけを記録した配列)のサイズ上限。
+// 不正/壊れたリプレイはランキング登録自体を失敗させず、単に付けずに通す。
+const REPLAY_MAX_EVENTS = 1000;
+const REPLAY_MAX_JSON_LEN = 20000;
+function sanitizeReplay(replay){
+  if(!Array.isArray(replay) || replay.length === 0 || replay.length > REPLAY_MAX_EVENTS) return null;
+  for(const ev of replay){
+    if(!Array.isArray(ev) || ev.length < 2 || ev.length > 3) return null;
+    if(typeof ev[0] !== 'number' || !Number.isFinite(ev[0]) || ev[0] < 0 || ev[0] > 3600) return null;
+    if(ev[1] !== 'j' && ev[1] !== 'lf' && ev[1] !== 'lb') return null;
+    if(ev.length === 3 && ev[2] !== 0 && ev[2] !== 1) return null;
+  }
+  const json = JSON.stringify(replay);
+  if(json.length > REPLAY_MAX_JSON_LEN) return null;
+  return json;
+}
+
 function corsHeaders(){
   return {
     'Access-Control-Allow-Origin': ALLOWED_ORIGIN,
@@ -226,7 +243,9 @@ export default {
       return jsonResponse({ ok:false, error:'claimed time exceeds elapsed real time' }, 400);
     }
 
-    const body = 'mode: ' + mode + '\nvalue: ' + Math.round(value) + '\nname: ' + name;
+    const replayJson = sanitizeReplay(data.replay);
+    let body = 'mode: ' + mode + '\nvalue: ' + Math.round(value) + '\nname: ' + name;
+    if(replayJson) body += '\nreplay: ' + replayJson;
 
     const ghRes = await createGithubIssue(env, {
       title: 'ランキング登録: ' + name,
