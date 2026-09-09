@@ -626,10 +626,10 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
   const MAX_SPEED = 1050;        // px/s
   const JUMP_IMPULSE = 420;      // upward kick from a manual jump (px/s)
   const PIT_FALL_Y = 640;        // falling past this = missed the jump, into the pit
-  const LANDING_PERFECT_DEG = 10;
-  const LANDING_OK_DEG = 30;
-  const STREAK_BONUS_PER = 0.05; // 連続で着地に成功するたびに+5%ずつ加速が乗る
-  const STREAK_CAP = 8;          // 最大+40%まで(それ以上は頭打ち)
+  const LANDING_PERFECT_DEG = 5;
+  const LANDING_OK_DEG = 15;
+  const STREAK_BONUS_PER = 0.03; // 連続で着地に成功するたびに+3%ずつ加速が乗る
+  const STREAK_CAP = 6;          // 最大+18%まで(それ以上は頭打ち)
 
   // マリオ64風の3段ジャンプ: 着地してすぐ(CHAIN_WINDOW_MS以内に)再ジャンプすると
   // 段数が上がってジャンプが高くなり、3段目でめっちゃ加速する。段数はそこでリセット。
@@ -820,7 +820,7 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
 
     if(diffDeg <= LANDING_PERFECT_DEG){
       // perfect landing: speed boost
-      player.speed = Math.min(MAX_SPEED, landedSpeed * 1.15);
+      player.speed = Math.min(MAX_SPEED, landedSpeed * 1.08);
       player.jumpStreak++;
     } else if(diffDeg <= LANDING_OK_DEG){
       player.speed = landedSpeed * 0.9;
