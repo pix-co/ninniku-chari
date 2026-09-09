@@ -155,20 +155,15 @@
           <div id="defaultStartPanel" style="display:flex; flex-direction:column; gap:10px;">
             <h1>走れニンニクマン</h1>
             <p>自動走行、操作不要!<br>Space/タップ: ジャンプ(穴・障害物に注意)<br>↑↓: 空中姿勢制御(着地で加減速)</p>
-            <button class="btn wide" id="startBtn" type="button">スタート</button>
-          </div>
-          <div id="modeSelectPanel" class="hidden" style="display:flex; flex-direction:column; gap:10px;">
-            <h1>走れニンニクマン</h1>
-            <p>自動走行、操作不要!<br>Space/タップ: ジャンプ(穴・障害物に注意)<br>↑↓: 空中姿勢制御(着地で加減速)<br>矢印キー: 選択 / Enter・Space: 決定</p>
-            <button class="btn wide" id="rtaModeBtn" type="button">16枚RTAモード</button>
-            <button class="btn wide" id="stageModeBtn" type="button">個別ステージモード</button>
-          </div>
-          <div id="stageSelectPanel" class="hidden" style="display:flex; flex-direction:column; gap:10px;">
-            <h1>ステージ選択</h1>
             <div class="btn-row">
               <button class="btn" id="stage1Btn" type="button">ステージ1<br>ニンニクガーデン</button>
               <button class="btn" id="stage2Btn" type="button">ステージ2<br>さむいさむいマウンテン</button>
             </div>
+          </div>
+          <div id="modeSelectPanel" class="hidden" style="display:flex; flex-direction:column; gap:10px;">
+            <h1>走れニンニクマン</h1>
+            <p>自動走行、操作不要!<br>Space/タップ: ジャンプ(穴・障害物に注意)<br>↑↓: 空中姿勢制御(着地で加減速)<br>矢印キー: 選択 / Enter・Space: 決定</p>
+            <button class="btn wide" id="rtaModeBtn" type="button">16枚RTAモード(開発中)</button>
             <button class="btn secondary wide" id="modeBackBtn" type="button">戻る</button>
           </div>
         </div>
@@ -301,11 +296,8 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
   const shareScoreBtnEl = document.getElementById('shareScoreBtn');
   const rankResultTextEl = document.getElementById('rankResultText');
   const defaultStartPanelEl = document.getElementById('defaultStartPanel');
-  const startBtnEl = document.getElementById('startBtn');
   const modeSelectPanelEl = document.getElementById('modeSelectPanel');
-  const stageSelectPanelEl = document.getElementById('stageSelectPanel');
   const rtaModeBtnEl = document.getElementById('rtaModeBtn');
-  const stageModeBtnEl = document.getElementById('stageModeBtn');
   const modeBackBtnEl = document.getElementById('modeBackBtn');
   const stage1BtnEl = document.getElementById('stage1Btn');
   const stage2BtnEl = document.getElementById('stage2Btn');
@@ -315,10 +307,8 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
   // getResultFocusables/updateResultFocusと同じ「フラットな配列+インデックス」方式。
   let startFocusIndex = 0;
   function getStartFocusables(){
-    if(!defaultStartPanelEl.classList.contains('hidden')) return [startBtnEl];
-    return stageSelectPanelEl.classList.contains('hidden')
-      ? [rtaModeBtnEl, stageModeBtnEl]
-      : [stage1BtnEl, stage2BtnEl, modeBackBtnEl];
+    if(!defaultStartPanelEl.classList.contains('hidden')) return [stage1BtnEl, stage2BtnEl];
+    return [rtaModeBtnEl, modeBackBtnEl];
   }
   function updateStartFocus(){
     getStartFocusables().forEach((btn, i) => {
@@ -328,28 +318,17 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
   }
   function showDefaultStart(){
     modeSelectPanelEl.classList.add('hidden');
-    stageSelectPanelEl.classList.add('hidden');
     defaultStartPanelEl.classList.remove('hidden');
     startFocusIndex = 0;
     updateStartFocus();
   }
   function showModeSelect(){
     defaultStartPanelEl.classList.add('hidden');
-    stageSelectPanelEl.classList.add('hidden');
     modeSelectPanelEl.classList.remove('hidden');
     startFocusIndex = 0;
     updateStartFocus();
   }
-  function showStageSelect(){
-    defaultStartPanelEl.classList.add('hidden');
-    modeSelectPanelEl.classList.add('hidden');
-    stageSelectPanelEl.classList.remove('hidden');
-    startFocusIndex = 0;
-    updateStartFocus();
-  }
-  stageModeBtnEl.addEventListener('click', showStageSelect);
-  modeBackBtnEl.addEventListener('click', showModeSelect);
-  startBtnEl.addEventListener('click', () => { selectedStageId = 1; startGame(); });
+  modeBackBtnEl.addEventListener('click', showDefaultStart);
   updateStartFocus();
 
   // ---------- Responsive scale (reused pattern from tetris_ninniku.html) ----------
@@ -400,8 +379,8 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
   loadKeyBindings();
 
   const heldActions = new Set();
-  // デバッグ用: どの画面からでもD+F同時押しでモード選択画面(16枚RTAモード/
-  // 個別ステージモードのボタンが並ぶ画面)に強制的に戻れるショートカット
+  // デバッグ用: どの画面からでもD+F同時押しでモード選択画面(未完成の
+  // 16枚RTAモードを試すための画面)に強制的に戻れるショートカット
   // (開発中の動作確認をすばやく行うための一時的な仕込み)
   const debugKeysHeld = new Set();
   let debugComboTriggered = false;
@@ -764,8 +743,8 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
     showDefaultStart();
   }
 
-  // デバッグ用: どの画面からでも強制的にモード選択画面(16枚RTAモード/
-  // 個別ステージモードのボタンが並ぶ画面)を開く(D+Fショートカット専用)
+  // デバッグ用: どの画面からでも強制的にモード選択画面(未完成の16枚RTA
+  // モードを試すための画面)を開く(D+Fショートカット専用)
   function debugOpenModeSelect(){
     state = 'start';
     goalOverlayEl.classList.add('hidden');
