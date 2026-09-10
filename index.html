@@ -99,6 +99,13 @@
   #soundToggleBtn{ position:absolute; top:54px; left:20px; width:34px; height:34px; border-radius:50%; background:var(--panel); border:2px solid var(--outline-dark); color:var(--terracotta); font-size:16px; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0; }
   #voiceVolumeSlider{ position:absolute; top:62px; left:62px; width:60px; height:16px; opacity:0.7; }
   #versionLabel{ position:absolute; bottom:14px; right:14px; color:rgba(255,255,255,.7); font-size:11px; font-weight:bold; text-shadow:0 1px 2px rgba(0,0,0,.5); pointer-events:none; }
+  #inputDisplay{ position:absolute; bottom:26px; left:50%; transform:translateX(-50%); display:flex; gap:6px; pointer-events:none; }
+  .input-key{ background:rgba(0,0,0,.35); color:#fff; font-size:11px; font-weight:900; padding:4px 10px; border-radius:6px; text-shadow:0 1px 2px rgba(0,0,0,.5); opacity:.5; transition:opacity .05s, background .05s; }
+  .input-key.active{ opacity:1; background:var(--golden); }
+  #taPanel{ position:absolute; top:88px; right:20px; background:rgba(0,0,0,.35); color:#fff; font-size:11px; font-weight:bold; text-shadow:0 1px 2px rgba(0,0,0,.5); padding:6px 10px; border-radius:8px; text-align:right; pointer-events:none; line-height:1.7; font-variant-numeric: tabular-nums; }
+  #taPanel.hidden{ display:none; }
+  #taChainBarWrap{ display:inline-block; width:36px; height:6px; background:rgba(255,255,255,.25); border-radius:3px; overflow:hidden; vertical-align:middle; margin-left:5px; }
+  #taChainBar{ display:block; height:100%; width:0%; background:var(--golden); }
   .overlay{ position:absolute; inset:0; background: var(--cream); border-radius:10px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; text-align:center; padding:16px; z-index:5; }
   .overlay.hidden{ display:none; }
   .overlay-card{ position:relative; display:flex; flex-direction:column; align-items:stretch; gap:10px; width:300px; }
@@ -155,7 +162,17 @@
       <div id="tcHint">タップでジャンプ</div>
       <button id="soundToggleBtn" type="button" title="効果音のON/OFF">🔊</button>
       <input type="range" id="voiceVolumeSlider" min="0" max="1" step="0.1" title="ボイス音量">
-      <div id="versionLabel">v0.2.2</div>
+      <div id="versionLabel">v0.2.3</div>
+      <div id="inputDisplay">
+        <div class="input-key" id="inputKeyLeft">←</div>
+        <div class="input-key" id="inputKeyJump">JUMP</div>
+        <div class="input-key" id="inputKeyRight">→</div>
+      </div>
+      <div id="taPanel" class="hidden">
+        <div>Frame: <span id="taFrameVal">0</span></div>
+        <div>Chain: <span id="taChainVal">-</span><span id="taChainBarWrap"><span id="taChainBar"></span></span></div>
+        <div>着地F: <span id="taLandFrameVal">-</span></div>
+      </div>
 
       <div id="startOverlay" class="overlay">
         <div class="overlay-card">
@@ -280,6 +297,14 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
   const distTotalEl = document.getElementById('distTotal');
   const timeValEl = document.getElementById('timeVal');
   const progressBarEl = document.getElementById('progressBar');
+  const inputKeyLeftEl = document.getElementById('inputKeyLeft');
+  const inputKeyRightEl = document.getElementById('inputKeyRight');
+  const inputKeyJumpEl = document.getElementById('inputKeyJump');
+  const taPanelEl = document.getElementById('taPanel');
+  const taFrameValEl = document.getElementById('taFrameVal');
+  const taChainValEl = document.getElementById('taChainVal');
+  const taChainBarEl = document.getElementById('taChainBar');
+  const taLandFrameValEl = document.getElementById('taLandFrameVal');
   const headerMascotImgEl = document.getElementById('headerMascotImg');
   const crashFlashEl = document.getElementById('crashFlash');
 
@@ -502,6 +527,7 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
     if(e.code === 'KeyR'){ document.getElementById('restartBtn').click(); }
     if(e.code === 'KeyL'){ document.getElementById('rankingBtn').click(); }
     if(e.code === 'KeyO'){ document.getElementById('popupBtn').click(); }
+    if(e.code === 'KeyT'){ taPanelEl.classList.toggle('hidden'); }
     if(!goalOverlayEl.classList.contains('hidden')){
       const focusables = getResultFocusables();
       if(e.code === 'ArrowLeft' || e.code === 'ArrowUp'){ resultFocusIndex = (resultFocusIndex - 1 + focusables.length) % focusables.length; updateResultFocus(); }
@@ -740,6 +766,7 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
   let player, camX, elapsed, lastTime, introTimer, introPhase;
   let physicsAccumulator = 0;
   const FIXED_DT = 1 / 120; // 物理更新を固定刻みにして、リプレイの再現精度を上げる
+  function frameOf(t){ return Math.floor(t * 60); } // TA表示用のフレーム番号(60fps換算)
   let resultFocusIndex = 0; // 0 = もう一度, 1 = スタートに戻る (goal/gameover画面での選択)
   let resultInputLockUntil = 0; // この時刻までは結果画面のEnter/Space確定を無視する
   let comboPopup = null; // { text, timer, maxTimer } — 連続ジャンプ成功時に浮かぶ表示
@@ -846,6 +873,10 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
     speedValEl.textContent = '0';
     distValEl.textContent = '0';
     progressBarEl.style.width = '0%';
+    taFrameValEl.textContent = '0';
+    taChainValEl.textContent = '-';
+    taChainBarEl.style.width = '0%';
+    taLandFrameValEl.textContent = '-';
     recordingActive = !replayModeActive;
     recordedInputs = [];
     replayEventIdx = 0;
@@ -1004,6 +1035,8 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
 
     // すぐに再ジャンプすれば3段ジャンプに繋げられる猶予時間をセット
     player.chainTimer = CHAIN_WINDOW_MS;
+
+    taLandFrameValEl.textContent = frameOf(elapsed);
   }
 
   function tryJump(){
@@ -1158,6 +1191,18 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
     distValEl.textContent = Math.round(player.x / 10);
     timeValEl.textContent = (runMode === 'rta' ? rtaTotalElapsed + elapsed : elapsed).toFixed(2);
     progressBarEl.style.width = Math.min(100, (player.x / STAR_X) * 100) + '%';
+
+    inputKeyLeftEl.classList.toggle('active', heldActions.has('leanBack'));
+    inputKeyRightEl.classList.toggle('active', heldActions.has('leanForward'));
+    inputKeyJumpEl.classList.toggle('active', heldActions.has('jump'));
+    taFrameValEl.textContent = frameOf(elapsed);
+    if(player.jumpChain > 0 && player.chainTimer > 0){
+      taChainValEl.textContent = player.jumpChain;
+      taChainBarEl.style.width = Math.max(0, Math.min(100, (player.chainTimer / CHAIN_WINDOW_MS) * 100)) + '%';
+    } else {
+      taChainValEl.textContent = '-';
+      taChainBarEl.style.width = '0%';
+    }
   }
 
   // ---------- ランキング(一時的にtetris_ninniku.htmlと同じ構成で追加) ----------
