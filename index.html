@@ -251,7 +251,7 @@
 
 <script>
 (() => {
-  const GAME_VERSION = 'v0.3.12';
+  const GAME_VERSION = 'v0.3.13';
   // 「それで満足か?」ボイスをユーザー要望で10分だけ無効化(期限後は自動で元に戻る)
   const SUPPRESS_SATISFIED_LINE_UNTIL = new Date('2026-09-10T12:58:30Z').getTime();
   document.getElementById('versionLabel').textContent = GAME_VERSION;
@@ -938,6 +938,9 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
     if(on) physicallyHeldActions.add(action); else physicallyHeldActions.delete(action);
     if(action === 'leanForward') recordInputEvent([elapsed, 'lf', on ? 1 : 0]);
     else if(action === 'leanBack') recordInputEvent([elapsed, 'lb', on ? 1 : 0]);
+    // ジャンプを「押している状態」も着地際の入力バフ判定(heldActions.has('jump'))に使うので、
+    // ジャンプ試行(j)とは別に保持のon/offも記録しないとリプレイで再現できない
+    else if(action === 'jump') recordInputEvent([elapsed, 'jh', on ? 1 : 0]);
   }
   function resyncHeldActionsToPhysical(){
     heldActions.clear();
@@ -950,6 +953,7 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
       if(ev[1] === 'j') tryJump();
       else if(ev[1] === 'lf'){ if(ev[2]) heldActions.add('leanForward'); else heldActions.delete('leanForward'); }
       else if(ev[1] === 'lb'){ if(ev[2]) heldActions.add('leanBack'); else heldActions.delete('leanBack'); }
+      else if(ev[1] === 'jh'){ if(ev[2]) heldActions.add('jump'); else heldActions.delete('jump'); }
       replayEventIdx++;
     }
   }
@@ -1040,6 +1044,7 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
       resyncHeldActionsToPhysical();
       if(heldActions.has('leanForward')) recordInputEvent([elapsed, 'lf', 1]);
       if(heldActions.has('leanBack')) recordInputEvent([elapsed, 'lb', 1]);
+      if(heldActions.has('jump')) recordInputEvent([elapsed, 'jh', 1]);
       startRecording();
     }
   }

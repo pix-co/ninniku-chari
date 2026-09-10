@@ -68,7 +68,7 @@ function sanitizeReplay(replay){
   for(const ev of replay){
     if(!Array.isArray(ev) || ev.length < 2 || ev.length > 3) return null;
     if(typeof ev[0] !== 'number' || !Number.isFinite(ev[0]) || ev[0] < 0 || ev[0] > 3600) return null;
-    if(ev[1] !== 'j' && ev[1] !== 'lf' && ev[1] !== 'lb') return null;
+    if(ev[1] !== 'j' && ev[1] !== 'lf' && ev[1] !== 'lb' && ev[1] !== 'jh') return null;
     if(ev.length === 3 && ev[2] !== 0 && ev[2] !== 1) return null;
   }
   const json = JSON.stringify(replay);
