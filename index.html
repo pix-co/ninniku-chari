@@ -251,7 +251,7 @@
 
 <script>
 (() => {
-  const GAME_VERSION = 'v0.3.10';
+  const GAME_VERSION = 'v0.3.11';
   // 「それで満足か?」ボイスをユーザー要望で10分だけ無効化(期限後は自動で元に戻る)
   const SUPPRESS_SATISFIED_LINE_UNTIL = new Date('2026-09-10T12:58:30Z').getTime();
   document.getElementById('versionLabel').textContent = GAME_VERSION;
@@ -1001,7 +1001,6 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
   // 次のステージへ即続行したいRTAでも、これ単体で土管演出からやり直せる。
   function beginStagePlay(stageId){
     loadStage(stageId);
-    resyncHeldActionsToPhysical(); // 実際に押しっぱなしのキーがあればそれは引き継ぎ、リプレイの残留状態だけ消す
     if(replayModeActive){
       stageLabelEl.textContent = 'リプレイ再生中 [Escで終了]' + (replayLabelText ? '  ' + replayLabelText : '');
     } else if(runMode === 'rta'){
@@ -1030,6 +1029,12 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
     recordingActive = !replayModeActive;
     recordedInputs = [];
     replayEventIdx = 0;
+    // 実際に押しっぱなしのキーがあればそれは引き継ぎ、リプレイの残留状態だけ消す。
+    // elapsed=0・recordedInputsを空にした後でやることで、開始時点で既に押されていた
+    // 入力も(押しっぱなしなので新規keydownが来ず記録が漏れがちだった分)漏れなく記録する。
+    resyncHeldActionsToPhysical();
+    if(heldActions.has('leanForward')) recordInputEvent([elapsed, 'lf', 1]);
+    if(heldActions.has('leanBack')) recordInputEvent([elapsed, 'lb', 1]);
     if(!replayModeActive) startRecording();
   }
 
