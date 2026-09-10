@@ -162,8 +162,8 @@
       <div id="tcHint">タップでジャンプ</div>
       <button id="soundToggleBtn" type="button" title="効果音のON/OFF">🔊</button>
       <input type="range" id="voiceVolumeSlider" min="0" max="1" step="0.1" title="ボイス音量">
-      <div id="versionLabel">v0.2.3</div>
-      <div id="inputDisplay">
+      <div id="versionLabel">v0.2.4</div>
+      <div id="inputDisplay" class="hidden">
         <div class="input-key" id="inputKeyLeft">←</div>
         <div class="input-key" id="inputKeyJump">JUMP</div>
         <div class="input-key" id="inputKeyRight">→</div>
@@ -172,6 +172,7 @@
         <div>Frame: <span id="taFrameVal">0</span></div>
         <div>Chain: <span id="taChainVal">-</span><span id="taChainBarWrap"><span id="taChainBar"></span></span></div>
         <div>着地F: <span id="taLandFrameVal">-</span></div>
+        <div>再ジャンプ: <span id="taRejumpVal">-</span></div>
       </div>
 
       <div id="startOverlay" class="overlay">
@@ -297,6 +298,7 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
   const distTotalEl = document.getElementById('distTotal');
   const timeValEl = document.getElementById('timeVal');
   const progressBarEl = document.getElementById('progressBar');
+  const inputDisplayEl = document.getElementById('inputDisplay');
   const inputKeyLeftEl = document.getElementById('inputKeyLeft');
   const inputKeyRightEl = document.getElementById('inputKeyRight');
   const inputKeyJumpEl = document.getElementById('inputKeyJump');
@@ -305,6 +307,7 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
   const taChainValEl = document.getElementById('taChainVal');
   const taChainBarEl = document.getElementById('taChainBar');
   const taLandFrameValEl = document.getElementById('taLandFrameVal');
+  const taRejumpValEl = document.getElementById('taRejumpVal');
   const headerMascotImgEl = document.getElementById('headerMascotImg');
   const crashFlashEl = document.getElementById('crashFlash');
 
@@ -494,6 +497,9 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
   // (開発中の動作確認をすばやく行うための一時的な仕込み)
   const debugKeysHeld = new Set();
   let debugComboTriggered = false;
+  // D+FでRTAモード選択に入れた状態のときだけ、TA向けのデバッグ表示(押してるボタン・
+  // フレーム数・チェイン猶予バー等)も解禁する。通常プレイでは出さない。
+  let debugUnlocked = false;
   window.addEventListener('keydown', (e) => {
     if(e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
     if(replayModeActive){
@@ -504,6 +510,8 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
       debugKeysHeld.add(e.code);
       if(debugKeysHeld.has('KeyD') && debugKeysHeld.has('KeyF') && !debugComboTriggered){
         debugComboTriggered = true;
+        debugUnlocked = true;
+        inputDisplayEl.classList.remove('hidden');
         closeRanking();
         debugOpenModeSelect();
       }
@@ -527,7 +535,7 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
     if(e.code === 'KeyR'){ document.getElementById('restartBtn').click(); }
     if(e.code === 'KeyL'){ document.getElementById('rankingBtn').click(); }
     if(e.code === 'KeyO'){ document.getElementById('popupBtn').click(); }
-    if(e.code === 'KeyT'){ taPanelEl.classList.toggle('hidden'); }
+    if(e.code === 'KeyT' && debugUnlocked){ taPanelEl.classList.toggle('hidden'); }
     if(!goalOverlayEl.classList.contains('hidden')){
       const focusables = getResultFocusables();
       if(e.code === 'ArrowLeft' || e.code === 'ArrowUp'){ resultFocusIndex = (resultFocusIndex - 1 + focusables.length) % focusables.length; updateResultFocus(); }
@@ -767,6 +775,7 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
   let physicsAccumulator = 0;
   const FIXED_DT = 1 / 120; // 物理更新を固定刻みにして、リプレイの再現精度を上げる
   function frameOf(t){ return Math.floor(t * 60); } // TA表示用のフレーム番号(60fps換算)
+  let lastLandFrame = null; // 直近の着地フレーム(チェインジャンプの最速判定に使う)
   let resultFocusIndex = 0; // 0 = もう一度, 1 = スタートに戻る (goal/gameover画面での選択)
   let resultInputLockUntil = 0; // この時刻までは結果画面のEnter/Space確定を無視する
   let comboPopup = null; // { text, timer, maxTimer } — 連続ジャンプ成功時に浮かぶ表示
@@ -877,6 +886,8 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
     taChainValEl.textContent = '-';
     taChainBarEl.style.width = '0%';
     taLandFrameValEl.textContent = '-';
+    taRejumpValEl.textContent = '-';
+    lastLandFrame = null;
     recordingActive = !replayModeActive;
     recordedInputs = [];
     replayEventIdx = 0;
@@ -1036,7 +1047,8 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
     // すぐに再ジャンプすれば3段ジャンプに繋げられる猶予時間をセット
     player.chainTimer = CHAIN_WINDOW_MS;
 
-    taLandFrameValEl.textContent = frameOf(elapsed);
+    lastLandFrame = frameOf(elapsed);
+    taLandFrameValEl.textContent = lastLandFrame;
   }
 
   function tryJump(){
@@ -1048,10 +1060,17 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
     // 最速フレームで再ジャンプできたので、予約していた着地の砂煙は出さない
     player.pendingDustLand = false;
 
-    if(player.jumpChain > 0 && player.chainTimer > 0){
+    const isChainContinue = player.jumpChain > 0 && player.chainTimer > 0;
+    if(isChainContinue){
       player.jumpChain = Math.min(3, player.jumpChain + 1);
     } else {
       player.jumpChain = 1;
+    }
+
+    // 着地→ジャンプの遅れをフレーム単位で表示(0F = 最速でチェインできている)
+    if(isChainContinue && lastLandFrame !== null){
+      const delay = frameOf(elapsed) - lastLandFrame;
+      taRejumpValEl.textContent = delay <= 0 ? '0F(最速!)' : ('+' + delay + 'F');
     }
 
     const impulseMul = JUMP_IMPULSE_LV[player.jumpChain - 1];
