@@ -251,7 +251,7 @@
 
 <script>
 (() => {
-  const GAME_VERSION = 'v0.3.9';
+  const GAME_VERSION = 'v0.3.10';
   // 「それで満足か?」ボイスをユーザー要望で10分だけ無効化(期限後は自動で元に戻る)
   const SUPPRESS_SATISFIED_LINE_UNTIL = new Date('2026-09-10T12:58:30Z').getTime();
   document.getElementById('versionLabel').textContent = GAME_VERSION;
@@ -539,6 +539,11 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
   loadKeyBindings();
 
   const heldActions = new Set();
+  // heldActionsはリプレイ再生中に直接add/deleteされることがあるため(applyReplayEvents)、
+  // 実際に物理的に押されているキー/タッチの状態はこちらに別途保持しておく。リプレイ終了時や
+  // 新しいランの開始時にheldActionsを空にリセットすると、実際にまだキーを押しっぱなしに
+  // している場合にその入力を取りこぼしてしまうので、リセット時はここから復元する。
+  const physicallyHeldActions = new Set();
   // デバッグ用: どの画面からでもD+F同時押しでモード選択画面(未完成の
   // 16枚RTAモードを試すための画面)に強制的に戻れるショートカット
   // (開発中の動作確認をすばやく行うための一時的な仕込み)
@@ -574,6 +579,10 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
       return;
     }
     if(replayModeActive){
+      // リプレイ再生中も実際の物理キー状態だけは追跡しておく(heldActions自体はリプレイの
+      // 合成入力が占有しているので触らない。リプレイ終了時にここから実際の状態を復元する)
+      const physAction = actionForCode(e.code);
+      if(physAction) physicallyHeldActions.add(physAction);
       if(e.code === 'Escape'){ e.preventDefault(); exitReplay(); }
       return;
     }
@@ -634,7 +643,12 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
     }
   });
   window.addEventListener('keyup', (e) => {
-    if(replayModeActive) return;
+    if(replayModeActive){
+      // keydown側と同様、リプレイ中も物理キーの離した状態だけは反映しておく
+      const physAction = actionForCode(e.code);
+      if(physAction) physicallyHeldActions.delete(physAction);
+      return;
+    }
     const action = actionForCode(e.code);
     if(action){ setHeldAction(action, false); }
     if(e.code === 'KeyD' || e.code === 'KeyF'){
@@ -921,8 +935,13 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
   }
   function setHeldAction(action, on){
     if(on) heldActions.add(action); else heldActions.delete(action);
+    if(on) physicallyHeldActions.add(action); else physicallyHeldActions.delete(action);
     if(action === 'leanForward') recordInputEvent([elapsed, 'lf', on ? 1 : 0]);
     else if(action === 'leanBack') recordInputEvent([elapsed, 'lb', on ? 1 : 0]);
+  }
+  function resyncHeldActionsToPhysical(){
+    heldActions.clear();
+    physicallyHeldActions.forEach(a => heldActions.add(a));
   }
   function applyReplayEvents(){
     if(!replayModeActive || !replayEvents) return;
@@ -949,7 +968,7 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
     replayModeActive = false;
     replayEvents = null;
     replayEventIdx = 0;
-    heldActions.clear(); // リプレイの最後の入力状態(方向キー押しっぱなし等)を持ち越さない
+    resyncHeldActionsToPhysical(); // リプレイの最後の入力状態(方向キー押しっぱなし等)を持ち越さない
     state = 'start';
     goalOverlayEl.classList.add('hidden');
     pauseOverlayEl.classList.add('hidden');
@@ -982,7 +1001,7 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
   // 次のステージへ即続行したいRTAでも、これ単体で土管演出からやり直せる。
   function beginStagePlay(stageId){
     loadStage(stageId);
-    heldActions.clear();
+    resyncHeldActionsToPhysical(); // 実際に押しっぱなしのキーがあればそれは引き継ぎ、リプレイの残留状態だけ消す
     if(replayModeActive){
       stageLabelEl.textContent = 'リプレイ再生中 [Escで終了]' + (replayLabelText ? '  ' + replayLabelText : '');
     } else if(runMode === 'rta'){
