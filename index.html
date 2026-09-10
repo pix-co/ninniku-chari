@@ -102,9 +102,9 @@
   #inputDisplay{ position:absolute; bottom:26px; left:50%; transform:translateX(-50%); display:flex; gap:6px; pointer-events:none; }
   .input-key{ background:rgba(0,0,0,.35); color:#fff; font-size:11px; font-weight:900; padding:4px 10px; border-radius:6px; text-shadow:0 1px 2px rgba(0,0,0,.5); opacity:.5; transition:opacity .05s, background .05s; }
   .input-key.active{ opacity:1; background:var(--golden); }
-  #taPanel{ position:absolute; top:88px; right:20px; background:rgba(0,0,0,.35); color:#fff; font-size:11px; font-weight:bold; text-shadow:0 1px 2px rgba(0,0,0,.5); padding:6px 10px; border-radius:8px; text-align:right; pointer-events:none; line-height:1.7; font-variant-numeric: tabular-nums; }
+  #taPanel{ position:absolute; top:88px; right:20px; min-width:190px; background:rgba(0,0,0,.55); color:#fff; font-size:14px; font-weight:bold; text-shadow:0 1px 2px rgba(0,0,0,.5); padding:12px 16px; border-radius:10px; text-align:right; pointer-events:none; line-height:2; font-variant-numeric: tabular-nums; }
   #taPanel.hidden{ display:none; }
-  #taChainBarWrap{ display:inline-block; width:36px; height:6px; background:rgba(255,255,255,.25); border-radius:3px; overflow:hidden; vertical-align:middle; margin-left:5px; }
+  #taChainBarWrap{ display:inline-block; width:50px; height:8px; background:rgba(255,255,255,.25); border-radius:4px; overflow:hidden; vertical-align:middle; margin-left:6px; }
   #taChainBar{ display:block; height:100%; width:0%; background:var(--golden); }
   .overlay{ position:absolute; inset:0; background: var(--cream); border-radius:10px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; text-align:center; padding:16px; z-index:5; }
   .overlay.hidden{ display:none; }
@@ -162,7 +162,7 @@
       <div id="tcHint">タップでジャンプ</div>
       <button id="soundToggleBtn" type="button" title="効果音のON/OFF">🔊</button>
       <input type="range" id="voiceVolumeSlider" min="0" max="1" step="0.1" title="ボイス音量">
-      <div id="versionLabel">v0.2.5</div>
+      <div id="versionLabel">v0.2.6</div>
       <div id="inputDisplay" class="hidden">
         <div class="input-key" id="inputKeyLeft">←</div>
         <div class="input-key" id="inputKeyJump">JUMP</div>
@@ -173,6 +173,9 @@
         <div>Chain: <span id="taChainVal">-</span><span id="taChainBarWrap"><span id="taChainBar"></span></span></div>
         <div>着地F: <span id="taLandFrameVal">-</span></div>
         <div>再ジャンプ: <span id="taRejumpVal">-</span></div>
+        <div>着地バフ: <span id="taLandBuffVal">-</span></div>
+        <div>3段ブースト: <span id="taTripleBoostVal">-</span></div>
+        <div>同時成立: <span id="taComboVal">-</span></div>
       </div>
 
       <div id="startOverlay" class="overlay">
@@ -308,6 +311,9 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
   const taChainBarEl = document.getElementById('taChainBar');
   const taLandFrameValEl = document.getElementById('taLandFrameVal');
   const taRejumpValEl = document.getElementById('taRejumpVal');
+  const taLandBuffValEl = document.getElementById('taLandBuffVal');
+  const taTripleBoostValEl = document.getElementById('taTripleBoostVal');
+  const taComboValEl = document.getElementById('taComboVal');
   const headerMascotImgEl = document.getElementById('headerMascotImg');
   const crashFlashEl = document.getElementById('crashFlash');
 
@@ -781,6 +787,7 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
   const FIXED_DT = 1 / 120; // 物理更新を固定刻みにして、リプレイの再現精度を上げる
   function frameOf(t){ return Math.floor(t * 60); } // TA表示用のフレーム番号(60fps換算)
   let lastLandFrame = null; // 直近の着地フレーム(チェインジャンプの最速判定に使う)
+  let lastLandBuffApplied = false; // 直近の着地で「着地際の入力バフ」(×1.08)が発動したか
   let resultFocusIndex = 0; // 0 = もう一度, 1 = スタートに戻る (goal/gameover画面での選択)
   let resultInputLockUntil = 0; // この時刻までは結果画面のEnter/Space確定を無視する
   let comboPopup = null; // { text, timer, maxTimer } — 連続ジャンプ成功時に浮かぶ表示
@@ -892,7 +899,11 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
     taChainBarEl.style.width = '0%';
     taLandFrameValEl.textContent = '-';
     taRejumpValEl.textContent = '-';
+    taLandBuffValEl.textContent = '-';
+    taTripleBoostValEl.textContent = '-';
+    taComboValEl.textContent = '-';
     lastLandFrame = null;
+    lastLandBuffApplied = false;
     recordingActive = !replayModeActive;
     recordedInputs = [];
     replayEventIdx = 0;
@@ -1039,9 +1050,13 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
     }
 
     // 着地と同時にジャンプ入力があれば、タイミングを讃えて少し加速する
-    if(heldActions.has('jump')){
+    const landingInputBuffApplied = heldActions.has('jump');
+    if(landingInputBuffApplied){
       player.speed = Math.min(MAX_SPEED, player.speed * 1.08);
     }
+    lastLandBuffApplied = landingInputBuffApplied;
+    taLandBuffValEl.textContent = landingInputBuffApplied ? '○(×1.08)' : '×';
+    taComboValEl.textContent = '-';
 
     // 砂煙はすぐには出さず、FAST_CHAIN_MSの間ジャンプが来なければ出す(予約方式)。
     // 先に出してから取り消す方式だと、取り消しが届くまでの数フレームは
@@ -1086,6 +1101,8 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
 
     if(player.jumpChain >= 3){
       player.speed = Math.min(MAX_SPEED, player.speed * TRIPLE_JUMP_SPEED_BOOST);
+      taTripleBoostValEl.textContent = '○(×1.6)';
+      taComboValEl.textContent = lastLandBuffApplied ? '○ 同時成立!' : '×(着地バフ無し)';
       comboPopup = { text: '3段ジャンプ!!!', timer: 1100, maxTimer: 1100, big: true };
       player.jumpChain = 0; // マリオ64と同じく、3段の後は最初からやり直し
     }
