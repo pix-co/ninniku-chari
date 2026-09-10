@@ -99,13 +99,6 @@
   #soundToggleBtn{ position:absolute; top:54px; left:20px; width:34px; height:34px; border-radius:50%; background:var(--panel); border:2px solid var(--outline-dark); color:var(--terracotta); font-size:16px; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0; }
   #voiceVolumeSlider{ position:absolute; top:62px; left:62px; width:60px; height:16px; opacity:0.7; }
   #versionLabel{ position:absolute; bottom:14px; right:14px; color:rgba(255,255,255,.7); font-size:11px; font-weight:bold; text-shadow:0 1px 2px rgba(0,0,0,.5); pointer-events:none; }
-  #inputDisplay{ position:absolute; bottom:26px; left:50%; transform:translateX(-50%); display:flex; gap:6px; pointer-events:none; }
-  .input-key{ background:rgba(0,0,0,.35); color:#fff; font-size:11px; font-weight:900; padding:4px 10px; border-radius:6px; text-shadow:0 1px 2px rgba(0,0,0,.5); opacity:.5; transition:opacity .05s, background .05s; }
-  .input-key.active{ opacity:1; background:var(--golden); }
-  #taPanel{ position:absolute; top:88px; right:20px; min-width:190px; background:rgba(0,0,0,.55); color:#fff; font-size:14px; font-weight:bold; text-shadow:0 1px 2px rgba(0,0,0,.5); padding:12px 16px; border-radius:10px; text-align:right; pointer-events:none; line-height:2; font-variant-numeric: tabular-nums; }
-  #taPanel.hidden{ display:none; }
-  #taChainBarWrap{ display:inline-block; width:50px; height:8px; background:rgba(255,255,255,.25); border-radius:4px; overflow:hidden; vertical-align:middle; margin-left:6px; }
-  #taChainBar{ display:block; height:100%; width:0%; background:var(--golden); }
   .overlay{ position:absolute; inset:0; background: var(--cream); border-radius:10px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; text-align:center; padding:16px; z-index:5; }
   .overlay.hidden{ display:none; }
   .overlay-card{ position:relative; display:flex; flex-direction:column; align-items:stretch; gap:10px; width:300px; }
@@ -162,21 +155,7 @@
       <div id="tcHint">タップでジャンプ</div>
       <button id="soundToggleBtn" type="button" title="効果音のON/OFF">🔊</button>
       <input type="range" id="voiceVolumeSlider" min="0" max="1" step="0.1" title="ボイス音量">
-      <div id="versionLabel">v0.2.8</div>
-      <div id="inputDisplay" class="hidden">
-        <div class="input-key" id="inputKeyLeft">←</div>
-        <div class="input-key" id="inputKeyJump">JUMP</div>
-        <div class="input-key" id="inputKeyRight">→</div>
-      </div>
-      <div id="taPanel" class="hidden">
-        <div>Frame: <span id="taFrameVal">0</span></div>
-        <div>Chain: <span id="taChainVal">-</span><span id="taChainBarWrap"><span id="taChainBar"></span></span></div>
-        <div>着地F: <span id="taLandFrameVal">-</span></div>
-        <div>再ジャンプ: <span id="taRejumpVal">-</span></div>
-        <div>着地バフ: <span id="taLandBuffVal">-</span></div>
-        <div>3段ブースト: <span id="taTripleBoostVal">-</span></div>
-        <div>同時成立: <span id="taComboVal">-</span></div>
-      </div>
+      <div id="versionLabel">v0.2.9</div>
 
       <div id="startOverlay" class="overlay">
         <div class="overlay-card">
@@ -301,19 +280,6 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
   const distTotalEl = document.getElementById('distTotal');
   const timeValEl = document.getElementById('timeVal');
   const progressBarEl = document.getElementById('progressBar');
-  const inputDisplayEl = document.getElementById('inputDisplay');
-  const inputKeyLeftEl = document.getElementById('inputKeyLeft');
-  const inputKeyRightEl = document.getElementById('inputKeyRight');
-  const inputKeyJumpEl = document.getElementById('inputKeyJump');
-  const taPanelEl = document.getElementById('taPanel');
-  const taFrameValEl = document.getElementById('taFrameVal');
-  const taChainValEl = document.getElementById('taChainVal');
-  const taChainBarEl = document.getElementById('taChainBar');
-  const taLandFrameValEl = document.getElementById('taLandFrameVal');
-  const taRejumpValEl = document.getElementById('taRejumpVal');
-  const taLandBuffValEl = document.getElementById('taLandBuffVal');
-  const taTripleBoostValEl = document.getElementById('taTripleBoostVal');
-  const taComboValEl = document.getElementById('taComboVal');
   const headerMascotImgEl = document.getElementById('headerMascotImg');
   const crashFlashEl = document.getElementById('crashFlash');
 
@@ -506,6 +472,7 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
   // D+FでRTAモード選択に入れた状態のときだけ、TA向けのデバッグ表示(押してるボタン・
   // フレーム数・チェイン猶予バー等)も解禁する。通常プレイでは出さない。
   let debugUnlocked = false;
+  let taOverlayVisible = true; // Tキーでcanvas上のTAデバッグ表示自体を隠せる(debugUnlocked時のみ有効)
   window.addEventListener('keydown', (e) => {
     if(e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
     if(replayModeActive){
@@ -517,8 +484,6 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
       if(debugKeysHeld.has('KeyD') && debugKeysHeld.has('KeyF') && !debugComboTriggered){
         debugComboTriggered = true;
         debugUnlocked = true;
-        inputDisplayEl.classList.remove('hidden');
-        taPanelEl.classList.remove('hidden');
         // モード選択画面への強制ジャンプは、プレイ中に割り込んで邪魔にならないよう
         // スタート画面にいるときだけ行う(TA表示の解除自体はどの画面でも即反映する)
         if(state === 'start'){
@@ -546,7 +511,7 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
     if(e.code === 'KeyR'){ document.getElementById('restartBtn').click(); }
     if(e.code === 'KeyL'){ document.getElementById('rankingBtn').click(); }
     if(e.code === 'KeyO'){ document.getElementById('popupBtn').click(); }
-    if(e.code === 'KeyT' && debugUnlocked){ taPanelEl.classList.toggle('hidden'); }
+    if(e.code === 'KeyT' && debugUnlocked){ taOverlayVisible = !taOverlayVisible; }
     if(!goalOverlayEl.classList.contains('hidden')){
       const focusables = getResultFocusables();
       if(e.code === 'ArrowLeft' || e.code === 'ArrowUp'){ resultFocusIndex = (resultFocusIndex - 1 + focusables.length) % focusables.length; updateResultFocus(); }
@@ -789,6 +754,8 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
   let lastLandFrame = null; // 直近の着地フレーム(チェインジャンプの最速判定に使う)
   let lastLandBuffApplied = false; // 直近の着地で「着地際の入力バフ」(×1.08)が発動したか
   let lastLandSpeedBeforeBonuses = 0; // 直近の着地時、ボーナス適用前の速度(合計倍率の算出用)
+  // TAパネルの表示内容をcanvas側にも複製して持っておく(録画にも写り込むように)
+  const taDebugState = { frame: '0', chain: '-', chainPct: 0, landFrame: '-', rejump: '-', landBuff: '-', tripleBoost: '-', combo: '-' };
   let resultFocusIndex = 0; // 0 = もう一度, 1 = スタートに戻る (goal/gameover画面での選択)
   let resultInputLockUntil = 0; // この時刻までは結果画面のEnter/Space確定を無視する
   let comboPopup = null; // { text, timer, maxTimer } — 連続ジャンプ成功時に浮かぶ表示
@@ -895,14 +862,7 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
     speedValEl.textContent = '0';
     distValEl.textContent = '0';
     progressBarEl.style.width = '0%';
-    taFrameValEl.textContent = '0';
-    taChainValEl.textContent = '-';
-    taChainBarEl.style.width = '0%';
-    taLandFrameValEl.textContent = '-';
-    taRejumpValEl.textContent = '-';
-    taLandBuffValEl.textContent = '-';
-    taTripleBoostValEl.textContent = '-';
-    taComboValEl.textContent = '-';
+    Object.assign(taDebugState, { frame: '0', chain: '-', chainPct: 0, landFrame: '-', rejump: '-', landBuff: '-', tripleBoost: '-', combo: '-' });
     lastLandFrame = null;
     lastLandBuffApplied = false;
     lastLandSpeedBeforeBonuses = 0;
@@ -1059,8 +1019,8 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
     lastLandBuffApplied = landingInputBuffApplied;
     lastLandSpeedBeforeBonuses = landedSpeed;
     const landTotalMul = landedSpeed > 0 ? player.speed / landedSpeed : 1;
-    taLandBuffValEl.textContent = (landingInputBuffApplied ? '○' : '×') + ' 倍率×' + landTotalMul.toFixed(2);
-    taComboValEl.textContent = '-';
+    taDebugState.landBuff = (landingInputBuffApplied ? '○' : '×') + ' 倍率×' + landTotalMul.toFixed(2);
+    taDebugState.combo = '-';
 
     // 砂煙はすぐには出さず、FAST_CHAIN_MSの間ジャンプが来なければ出す(予約方式)。
     // 先に出してから取り消す方式だと、取り消しが届くまでの数フレームは
@@ -1072,7 +1032,7 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
     player.chainTimer = CHAIN_WINDOW_MS;
 
     lastLandFrame = frameOf(elapsed);
-    taLandFrameValEl.textContent = lastLandFrame;
+    taDebugState.landFrame = String(lastLandFrame);
   }
 
   function tryJump(){
@@ -1094,7 +1054,8 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
     // 着地→ジャンプの遅れをフレーム単位で表示(0F = 最速でチェインできている)
     if(isChainContinue && lastLandFrame !== null){
       const delay = frameOf(elapsed) - lastLandFrame;
-      taRejumpValEl.textContent = delay <= 0 ? '0F(最速!)' : ('+' + delay + 'F');
+      const rejumpText = delay <= 0 ? '0F(最速!)' : ('+' + delay + 'F');
+      taDebugState.rejump = rejumpText;
     }
 
     const impulseMul = JUMP_IMPULSE_LV[player.jumpChain - 1];
@@ -1108,13 +1069,16 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
       player.speed = Math.min(MAX_SPEED, player.speed * TRIPLE_JUMP_SPEED_BOOST);
       const boostMul = speedBeforeBoost > 0 ? player.speed / speedBeforeBoost : 1;
       const capped = boostMul < TRIPLE_JUMP_SPEED_BOOST - 0.001;
-      taTripleBoostValEl.textContent = '○ 倍率×' + boostMul.toFixed(2) + (capped ? '(頭打ち)' : '');
+      const tripleBoostText = '○ 倍率×' + boostMul.toFixed(2) + (capped ? '(頭打ち)' : '');
+      taDebugState.tripleBoost = tripleBoostText;
+      let comboText;
       if(lastLandBuffApplied && lastLandSpeedBeforeBonuses > 0){
         const cycleMul = player.speed / lastLandSpeedBeforeBonuses;
-        taComboValEl.textContent = '○ 合計×' + cycleMul.toFixed(2);
+        comboText = '○ 合計×' + cycleMul.toFixed(2);
       } else {
-        taComboValEl.textContent = '×(着地バフ無し)';
+        comboText = '×(着地バフ無し)';
       }
+      taDebugState.combo = comboText;
       comboPopup = { text: '3段ジャンプ!!!', timer: 1100, maxTimer: 1100, big: true };
       player.jumpChain = 0; // マリオ64と同じく、3段の後は最初からやり直し
     }
@@ -1245,16 +1209,14 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
     timeValEl.textContent = (runMode === 'rta' ? rtaTotalElapsed + elapsed : elapsed).toFixed(2);
     progressBarEl.style.width = Math.min(100, (player.x / STAR_X) * 100) + '%';
 
-    inputKeyLeftEl.classList.toggle('active', heldActions.has('leanBack'));
-    inputKeyRightEl.classList.toggle('active', heldActions.has('leanForward'));
-    inputKeyJumpEl.classList.toggle('active', heldActions.has('jump'));
-    taFrameValEl.textContent = frameOf(elapsed);
+    taDebugState.frame = String(frameOf(elapsed));
     if(player.jumpChain > 0 && player.chainTimer > 0){
-      taChainValEl.textContent = player.jumpChain;
-      taChainBarEl.style.width = Math.max(0, Math.min(100, (player.chainTimer / CHAIN_WINDOW_MS) * 100)) + '%';
+      const chainPct = Math.max(0, Math.min(100, (player.chainTimer / CHAIN_WINDOW_MS) * 100));
+      taDebugState.chain = String(player.jumpChain);
+      taDebugState.chainPct = chainPct;
     } else {
-      taChainValEl.textContent = '-';
-      taChainBarEl.style.width = '0%';
+      taDebugState.chain = '-';
+      taDebugState.chainPct = 0;
     }
   }
 
@@ -2194,6 +2156,86 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
 
     drawComboPopup();
     if(THEME.snow) drawSnowfall(now);
+    drawTaDebugOverlay();
+  }
+
+  // デバッグモード中のTA表示をcanvas上にも描画する(DOM要素はcanvas.captureStream()の
+  // 録画に写らないため、録画にも残したい情報はここで複製して描く)
+  function drawTaDebugOverlay(){
+    if(!debugUnlocked || !taOverlayVisible) return;
+
+    ctx.save();
+    ctx.font = 'bold 12px "Yu Gothic", Meiryo, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
+    const lines = [
+      'Frame: ' + taDebugState.frame,
+      'Chain: ' + taDebugState.chain,
+      '着地F: ' + taDebugState.landFrame,
+      '再ジャンプ: ' + taDebugState.rejump,
+      '着地バフ: ' + taDebugState.landBuff,
+      '3段ブースト: ' + taDebugState.tripleBoost,
+      '同時成立: ' + taDebugState.combo,
+    ];
+    const padX = 12, padY = 10, lineH = 20;
+    const boxW = 230;
+    const boxH = padY * 2 + lines.length * lineH;
+    const boxX = 960 - 20 - boxW;
+    const boxY = 88;
+    ctx.fillStyle = 'rgba(0,0,0,.55)';
+    if(ctx.roundRect){
+      ctx.beginPath();
+      ctx.roundRect(boxX, boxY, boxW, boxH, 10);
+      ctx.fill();
+    } else {
+      ctx.fillRect(boxX, boxY, boxW, boxH);
+    }
+    ctx.fillStyle = '#fff';
+    lines.forEach((line, i) => {
+      ctx.fillText(line, boxX + padX, boxY + padY + (i + 1) * lineH - 6);
+    });
+    // Chainの行にミニバーを添える(2行目 = i===1)
+    const chainBarX = boxX + padX + ctx.measureText('Chain: ' + taDebugState.chain).width + 8;
+    const chainBarY = boxY + padY + 2 * lineH - 6 - 8;
+    ctx.fillStyle = 'rgba(255,255,255,.25)';
+    ctx.fillRect(chainBarX, chainBarY, 44, 7);
+    ctx.fillStyle = '#F3980D';
+    ctx.fillRect(chainBarX, chainBarY, 44 * (taDebugState.chainPct / 100), 7);
+    ctx.restore();
+
+    drawInputDisplayOverlay();
+  }
+
+  function drawInputDisplayOverlay(){
+    const items = [
+      { label: '←', active: heldActions.has('leanBack') },
+      { label: 'JUMP', active: heldActions.has('jump') },
+      { label: '→', active: heldActions.has('leanForward') },
+    ];
+    ctx.save();
+    ctx.font = 'bold 12px "Yu Gothic", Meiryo, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const gap = 6, padX = 10, keyH = 22;
+    const widths = items.map(it => ctx.measureText(it.label).width + padX * 2);
+    const totalW = widths.reduce((a, b) => a + b, 0) + gap * (items.length - 1);
+    let x = 480 - totalW / 2;
+    const y = 540 - 26 - keyH / 2;
+    items.forEach((it, i) => {
+      const w = widths[i];
+      ctx.fillStyle = it.active ? '#F3980D' : 'rgba(0,0,0,.35)';
+      if(ctx.roundRect){
+        ctx.beginPath();
+        ctx.roundRect(x, y - keyH / 2, w, keyH, 6);
+        ctx.fill();
+      } else {
+        ctx.fillRect(x, y - keyH / 2, w, keyH);
+      }
+      ctx.fillStyle = '#fff';
+      ctx.fillText(it.label, x + w / 2, y + 1);
+      x += w + gap;
+    });
+    ctx.restore();
   }
 
   function drawComboPopup(){
