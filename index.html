@@ -162,7 +162,7 @@
       <div id="tcHint">タップでジャンプ</div>
       <button id="soundToggleBtn" type="button" title="効果音のON/OFF">🔊</button>
       <input type="range" id="voiceVolumeSlider" min="0" max="1" step="0.1" title="ボイス音量">
-      <div id="versionLabel">v0.3.3</div>
+      <div id="versionLabel">v0.3.4</div>
 
       <div id="startOverlay" class="overlay">
         <div class="overlay-card">
@@ -227,6 +227,7 @@
             <div class="keybind-row"><span>空中姿勢(右へ)</span><div class="keybind-btns"><button class="btn secondary keybind-btn" id="keyBtn-leanForward-0" type="button"></button><button class="btn secondary keybind-btn" id="keyBtn-leanForward-1" type="button"></button></div></div>
             <div class="keybind-row"><span>空中姿勢(左へ)</span><div class="keybind-btns"><button class="btn secondary keybind-btn" id="keyBtn-leanBack-0" type="button"></button><button class="btn secondary keybind-btn" id="keyBtn-leanBack-1" type="button"></button></div></div>
           </div>
+          <p id="keybindWarning" class="hidden" style="color:var(--terracotta); font-weight:900; margin:-4px 0 4px;"></p>
           <button class="btn secondary wide" id="keysResetBtn" type="button">キー割り当てを初期値に戻す</button>
           <button class="btn wide" id="closeSettingsBtn" type="button">とじる</button>
         </div>
@@ -238,7 +239,7 @@
         <button class="btn secondary" id="pauseBtn">一時停止 [P]</button>
         <button class="btn secondary" id="restartBtn">やり直す [R]</button>
         <button class="btn secondary" id="rankingBtn">ランキング [L]</button>
-        <button class="btn secondary" id="settingsBtn">操作設定</button>
+        <button class="btn secondary" id="settingsBtn">操作設定 [C]</button>
         <a class="btn secondary" id="wikiLinkBtn" href="wiki.html" target="_blank" rel="noopener" style="text-decoration:none; display:flex; align-items:center; justify-content:center;">RTA攻略Wiki</a>
         <button class="btn secondary" id="popupBtn">ポップアップ化 [O]</button>
       </div>
@@ -401,6 +402,7 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
   const settingsOverlayEl = document.getElementById('settingsOverlay');
   const closeSettingsBtnEl = document.getElementById('closeSettingsBtn');
   const keysResetBtnEl = document.getElementById('keysResetBtn');
+  const keybindWarningEl = document.getElementById('keybindWarning');
   const scoreSubmitEl = document.getElementById('scoreSubmit');
   const nameInputEl = document.getElementById('nameInput');
   const submitScoreBtnEl = document.getElementById('submitScoreBtn');
@@ -457,11 +459,12 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
 
   // ---------- Key bindings (reused save/load pattern) ----------
   const DEFAULT_KEYS = {
-    leanForward: ['ArrowRight', 'KeyS'],
-    leanBack: ['ArrowLeft', 'KeyW'],
+    leanForward: ['ArrowRight', null],
+    leanBack: ['ArrowLeft', null],
     jump: ['Space', null],
     pause: ['KeyP', null],
   };
+  const ACTION_LABELS = { jump: 'ジャンプ', leanForward: '空中姿勢(右へ)', leanBack: '空中姿勢(左へ)', pause: '一時停止' };
   const KEY_ACTIONS = Object.keys(DEFAULT_KEYS);
   const SETTINGS_KEY_ACTIONS = ['jump', 'leanForward', 'leanBack']; // 操作設定画面に出す対象(pauseは対象外)
   function cloneKeys(src){
@@ -514,14 +517,16 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
     });
   }
   function assignKeyBinding(action, slot, code){
-    KEY_ACTIONS.forEach(a => {
-      [0, 1].forEach(s => {
-        if((a !== action || s !== slot) && keyBindings[a][s] === code) keyBindings[a][s] = null;
-      });
-    });
     keyBindings[action][slot] = code;
     saveKeyBindings();
     refreshKeyBindButtons();
+  }
+  let keybindWarningTimer = null;
+  function showKeybindWarning(text){
+    keybindWarningEl.textContent = text;
+    keybindWarningEl.classList.remove('hidden');
+    if(keybindWarningTimer) clearTimeout(keybindWarningTimer);
+    keybindWarningTimer = setTimeout(() => { keybindWarningEl.classList.add('hidden'); }, 2200);
   }
   loadKeyBindings();
 
@@ -541,8 +546,20 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
       e.preventDefault();
       const captured = keyCaptureAction;
       keyCaptureAction = null;
-      if(e.code !== 'Escape'){ assignKeyBinding(captured.action, captured.slot, e.code); }
-      else { refreshKeyBindButtons(); }
+      if(e.code === 'Escape'){
+        refreshKeyBindButtons();
+      } else {
+        const otherSlot = 1 - captured.slot;
+        const conflictAction = keyBindings[captured.action][otherSlot] === e.code
+          ? captured.action
+          : KEY_ACTIONS.find(a => a !== captured.action && keyBindings[a].includes(e.code));
+        if(conflictAction){
+          showKeybindWarning('そのキーは「' + (ACTION_LABELS[conflictAction] || conflictAction) + '」に割り当て済みです');
+          refreshKeyBindButtons();
+        } else {
+          assignKeyBinding(captured.action, captured.slot, e.code);
+        }
+      }
       return;
     }
     if(replayModeActive){
@@ -581,6 +598,7 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
     if(e.code === 'KeyR'){ document.getElementById('restartBtn').click(); }
     if(e.code === 'KeyL'){ document.getElementById('rankingBtn').click(); }
     if(e.code === 'KeyO'){ document.getElementById('popupBtn').click(); }
+    if(e.code === 'KeyC'){ openSettings(); }
     if(e.code === 'KeyT' && debugUnlocked){ taOverlayVisible = !taOverlayVisible; }
     if(e.code === 'KeyW'){ quickSave(); }
     if(e.code === 'KeyE'){ quickLoad(); }
@@ -1470,6 +1488,7 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
     if(state === 'play'){ state = 'paused'; settingsReturnToPlay = true; }
     else { settingsReturnToPlay = false; }
     keyCaptureAction = null;
+    keybindWarningEl.classList.add('hidden');
     refreshKeyBindButtons();
     settingsOverlayEl.classList.remove('hidden');
   }
@@ -1490,6 +1509,7 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
     [0, 1].forEach(slot => {
       keyBtnEls[a][slot].addEventListener('click', () => {
         keyCaptureAction = { action: a, slot };
+        keybindWarningEl.classList.add('hidden');
         refreshKeyBindButtons();
       });
     });
