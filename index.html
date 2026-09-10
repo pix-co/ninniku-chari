@@ -162,7 +162,7 @@
       <div id="tcHint">タップでジャンプ</div>
       <button id="soundToggleBtn" type="button" title="効果音のON/OFF">🔊</button>
       <input type="range" id="voiceVolumeSlider" min="0" max="1" step="0.1" title="ボイス音量">
-      <div id="versionLabel">v0.2.6</div>
+      <div id="versionLabel">v0.2.7</div>
       <div id="inputDisplay" class="hidden">
         <div class="input-key" id="inputKeyLeft">←</div>
         <div class="input-key" id="inputKeyJump">JUMP</div>
@@ -788,6 +788,7 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
   function frameOf(t){ return Math.floor(t * 60); } // TA表示用のフレーム番号(60fps換算)
   let lastLandFrame = null; // 直近の着地フレーム(チェインジャンプの最速判定に使う)
   let lastLandBuffApplied = false; // 直近の着地で「着地際の入力バフ」(×1.08)が発動したか
+  let lastLandSpeedBeforeBonuses = 0; // 直近の着地時、ボーナス適用前の速度(合計倍率の算出用)
   let resultFocusIndex = 0; // 0 = もう一度, 1 = スタートに戻る (goal/gameover画面での選択)
   let resultInputLockUntil = 0; // この時刻までは結果画面のEnter/Space確定を無視する
   let comboPopup = null; // { text, timer, maxTimer } — 連続ジャンプ成功時に浮かぶ表示
@@ -904,6 +905,7 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
     taComboValEl.textContent = '-';
     lastLandFrame = null;
     lastLandBuffApplied = false;
+    lastLandSpeedBeforeBonuses = 0;
     recordingActive = !replayModeActive;
     recordedInputs = [];
     replayEventIdx = 0;
@@ -1055,7 +1057,9 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
       player.speed = Math.min(MAX_SPEED, player.speed * 1.08);
     }
     lastLandBuffApplied = landingInputBuffApplied;
-    taLandBuffValEl.textContent = landingInputBuffApplied ? '○(×1.08)' : '×';
+    lastLandSpeedBeforeBonuses = landedSpeed;
+    const landTotalMul = landedSpeed > 0 ? player.speed / landedSpeed : 1;
+    taLandBuffValEl.textContent = (landingInputBuffApplied ? '○' : '×') + ' 倍率×' + landTotalMul.toFixed(2);
     taComboValEl.textContent = '-';
 
     // 砂煙はすぐには出さず、FAST_CHAIN_MSの間ジャンプが来なければ出す(予約方式)。
@@ -1100,9 +1104,17 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
     player.vy = player.speed * Math.sin(angle) - JUMP_IMPULSE * impulseMul;
 
     if(player.jumpChain >= 3){
+      const speedBeforeBoost = player.speed;
       player.speed = Math.min(MAX_SPEED, player.speed * TRIPLE_JUMP_SPEED_BOOST);
-      taTripleBoostValEl.textContent = '○(×1.6)';
-      taComboValEl.textContent = lastLandBuffApplied ? '○ 同時成立!' : '×(着地バフ無し)';
+      const boostMul = speedBeforeBoost > 0 ? player.speed / speedBeforeBoost : 1;
+      const capped = boostMul < TRIPLE_JUMP_SPEED_BOOST - 0.001;
+      taTripleBoostValEl.textContent = '○ 倍率×' + boostMul.toFixed(2) + (capped ? '(頭打ち)' : '');
+      if(lastLandBuffApplied && lastLandSpeedBeforeBonuses > 0){
+        const cycleMul = player.speed / lastLandSpeedBeforeBonuses;
+        taComboValEl.textContent = '○ 合計×' + cycleMul.toFixed(2);
+      } else {
+        taComboValEl.textContent = '×(着地バフ無し)';
+      }
       comboPopup = { text: '3段ジャンプ!!!', timer: 1100, maxTimer: 1100, big: true };
       player.jumpChain = 0; // マリオ64と同じく、3段の後は最初からやり直し
     }
