@@ -155,7 +155,7 @@
       <div id="tcHint">タップでジャンプ</div>
       <button id="soundToggleBtn" type="button" title="効果音のON/OFF">🔊</button>
       <input type="range" id="voiceVolumeSlider" min="0" max="1" step="0.1" title="ボイス音量">
-      <div id="versionLabel">v0.2.9</div>
+      <div id="versionLabel">v0.2.10</div>
 
       <div id="startOverlay" class="overlay">
         <div class="overlay-card">
@@ -512,6 +512,8 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
     if(e.code === 'KeyL'){ document.getElementById('rankingBtn').click(); }
     if(e.code === 'KeyO'){ document.getElementById('popupBtn').click(); }
     if(e.code === 'KeyT' && debugUnlocked){ taOverlayVisible = !taOverlayVisible; }
+    if(e.code === 'KeyQ'){ quickSave(); }
+    if(e.code === 'KeyE'){ quickLoad(); }
     if(!goalOverlayEl.classList.contains('hidden')){
       const focusables = getResultFocusables();
       if(e.code === 'ArrowLeft' || e.code === 'ArrowUp'){ resultFocusIndex = (resultFocusIndex - 1 + focusables.length) % focusables.length; updateResultFocus(); }
@@ -756,6 +758,25 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
   let lastLandSpeedBeforeBonuses = 0; // 直近の着地時、ボーナス適用前の速度(合計倍率の算出用)
   // TAパネルの表示内容をcanvas側にも複製して持っておく(録画にも写り込むように)
   const taDebugState = { frame: '0', chain: '-', chainPct: 0, landFrame: '-', rejump: '-', landBuff: '-', tripleBoost: '-', combo: '-' };
+
+  // クイックセーブ/ロード(デバッグモード限定の練習用。不正防止のため
+  // debugUnlocked時はランキング登録自体が既にできなくなっている)
+  let savedState = null;
+  function quickSave(){
+    if(!debugUnlocked || state !== 'play') return;
+    savedState = { stageId: currentStageId, elapsed, camX, player: { ...player } };
+    comboPopup = { text: 'クイックセーブ!', timer: 700, maxTimer: 700 };
+  }
+  function quickLoad(){
+    if(!debugUnlocked || state !== 'play' || !savedState || savedState.stageId !== currentStageId) return;
+    elapsed = savedState.elapsed;
+    camX = savedState.camX;
+    player = { ...savedState.player };
+    physicsAccumulator = 0;
+    lastTime = null;
+    dustPuffs = [];
+    comboPopup = { text: 'クイックロード!', timer: 700, maxTimer: 700 };
+  }
   let resultFocusIndex = 0; // 0 = もう一度, 1 = スタートに戻る (goal/gameover画面での選択)
   let resultInputLockUntil = 0; // この時刻までは結果画面のEnter/Space確定を無視する
   let comboPopup = null; // { text, timer, maxTimer } — 連続ジャンプ成功時に浮かぶ表示
