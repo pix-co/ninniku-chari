@@ -162,7 +162,7 @@
       <div id="tcHint">タップでジャンプ</div>
       <button id="soundToggleBtn" type="button" title="効果音のON/OFF">🔊</button>
       <input type="range" id="voiceVolumeSlider" min="0" max="1" step="0.1" title="ボイス音量">
-      <div id="versionLabel">v0.3.4</div>
+      <div id="versionLabel">v0.3.5</div>
 
       <div id="startOverlay" class="overlay">
         <div class="overlay-card">
@@ -465,6 +465,7 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
     pause: ['KeyP', null],
   };
   const ACTION_LABELS = { jump: 'ジャンプ', leanForward: '空中姿勢(右へ)', leanBack: '空中姿勢(左へ)', pause: '一時停止' };
+  const RESERVED_SETTINGS_CODES = ['KeyW', 'KeyS']; // クイックセーブ(W)等と衝突するため操作設定では割り当て不可にする
   const KEY_ACTIONS = Object.keys(DEFAULT_KEYS);
   const SETTINGS_KEY_ACTIONS = ['jump', 'leanForward', 'leanBack']; // 操作設定画面に出す対象(pauseは対象外)
   function cloneKeys(src){
@@ -547,6 +548,9 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
       const captured = keyCaptureAction;
       keyCaptureAction = null;
       if(e.code === 'Escape'){
+        refreshKeyBindButtons();
+      } else if(RESERVED_SETTINGS_CODES.includes(e.code)){
+        showKeybindWarning('そのキーは操作設定では割り当てられません');
         refreshKeyBindButtons();
       } else {
         const otherSlot = 1 - captured.slot;
