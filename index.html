@@ -155,7 +155,7 @@
       <div id="tcHint">タップでジャンプ</div>
       <button id="soundToggleBtn" type="button" title="効果音のON/OFF">🔊</button>
       <input type="range" id="voiceVolumeSlider" min="0" max="1" step="0.1" title="ボイス音量">
-      <div id="versionLabel">v0.2.11</div>
+      <div id="versionLabel">v0.3.0</div>
 
       <div id="startOverlay" class="overlay">
         <div class="overlay-card">
@@ -171,6 +171,7 @@
             <h1>走れニンニクマン</h1>
             <p>自動走行、操作不要!<br>Space/タップ: ジャンプ(穴・障害物に注意)<br>←→: 空中姿勢制御(着地で加減速)<br>矢印キー: 選択 / Enter・Space: 決定</p>
             <button class="btn wide" id="rtaModeBtn" type="button">16枚RTAモード(開発中)</button>
+            <button class="btn secondary wide" id="practiceStageBtn" type="button">検証用ステージ(10000m フラット)</button>
             <button class="btn secondary wide" id="modeBackBtn" type="button">戻る</button>
           </div>
         </div>
@@ -383,6 +384,7 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
   const defaultStartPanelEl = document.getElementById('defaultStartPanel');
   const modeSelectPanelEl = document.getElementById('modeSelectPanel');
   const rtaModeBtnEl = document.getElementById('rtaModeBtn');
+  const practiceStageBtnEl = document.getElementById('practiceStageBtn');
   const modeBackBtnEl = document.getElementById('modeBackBtn');
   const stage1BtnEl = document.getElementById('stage1Btn');
   const stage2BtnEl = document.getElementById('stage2Btn');
@@ -393,7 +395,7 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
   let startFocusIndex = 0;
   function getStartFocusables(){
     if(!defaultStartPanelEl.classList.contains('hidden')) return [stage1BtnEl, stage2BtnEl];
-    return [rtaModeBtnEl, modeBackBtnEl];
+    return [rtaModeBtnEl, practiceStageBtnEl, modeBackBtnEl];
   }
   function updateStartFocus(){
     getStartFocusables().forEach((btn, i) => {
@@ -665,9 +667,27 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
         backdrop: 'mountain', decor: 'snow', snow: true,
       },
     },
+    3: {
+      name: '検証用: フラットステージ',
+      practice: true, // 16枚RTAモードのコース順には含めない検証専用ステージ
+      goalX: 100000, // 10000m(距離表示はgoalX/10メートル)
+      terrain: [
+        { x: 0,      y: GROUND_BASE },
+        { x: 100000, y: GROUND_BASE }, // goal(何もない一直線の平坦地形)
+      ],
+      obstacles: [],
+      theme: {
+        sky: ['#6fc1ef', '#bfe8ff'],
+        groundFill: '#4a9c52', groundStroke: '#2f6e35',
+        iceFill: '#cdeffd', iceStroke: '#7fd6f5',
+        obstacleFill: '#6b6258', obstacleStroke: '#3f3a33',
+        backdrop: 'garden', decor: 'none', snow: false,
+      },
+    },
   };
   // ステージが増えるたびにSTAGESへ追記すれば、16枚RTAモードは自動でその順番を通しでプレイする
-  const STAGE_ORDER = Object.keys(STAGES).map(Number).sort((a, b) => a - b);
+  // (practice:trueの検証用ステージはRTAの通し順には含めない)
+  const STAGE_ORDER = Object.keys(STAGES).map(Number).filter(id => !STAGES[id].practice).sort((a, b) => a - b);
 
   let selectedStageId = 1;
   let currentStageId = 1;
@@ -692,6 +712,7 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
   // ステージボタンは押したら即スタート(選択→決定の2段階操作は不要)
   stage1BtnEl.addEventListener('click', () => { selectedStageId = 1; startGame(); });
   stage2BtnEl.addEventListener('click', () => { selectedStageId = 2; startGame(); });
+  practiceStageBtnEl.addEventListener('click', () => { selectedStageId = 3; startGame(); });
 
   function findSegment(x){
     for(let i = 0; i < terrain.length - 1; i++){
