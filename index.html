@@ -246,7 +246,7 @@
 
 <script>
 (() => {
-  const GAME_VERSION = 'v0.4.5';
+  const GAME_VERSION = 'v0.4.6';
   // 「それで満足か?」ボイスをユーザー要望で10分だけ無効化(期限後は自動で元に戻る)
   const SUPPRESS_SATISFIED_LINE_UNTIL = new Date('2026-09-10T12:58:30Z').getTime();
   document.getElementById('versionLabel').textContent = GAME_VERSION;
@@ -871,6 +871,7 @@ const BOMB_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAABiCAYA
   let rtaStageIndex = 0;  // RTA中、STAGE_ORDER上の現在位置
   let rtaTotalElapsed = 0; // RTA中、クリア済みステージの合計タイム(秒)
   let activeBridges = []; // 現在のステージの「乗ったら傾く橋」(updateBridges()参照)
+  let activeBombs = [];   // 現在のステージのボム飾り(触れると吹き飛ぶ。updateBombs()参照)
 
   function loadStage(id){
     const s = STAGES[id];
@@ -895,6 +896,17 @@ const BOMB_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAABiCAYA
       b.L.y = restY;
       b.R.y = restY;
       return { L: b.L, C: b.C, R: b.R, restY, tilt: 0 };
+    });
+
+    // ボム飾り: 触れた瞬間の状態(飛んだか/着地したか)をステージごとに持ち直す
+    activeBombs = (s.bombs || []).map(bx => {
+      const info = groundInfoAt(bx);
+      return {
+        baseX: bx, wx: bx, groundY0: info ? info.y : GROUND_BASE,
+        wy: 0, vx: 0, vy: 0, rot: 0, vrot: 0,
+        flying: false, settled: false,
+        scale: 0.85 + hash01(bx) * 0.3,
+      };
     });
   }
   loadStage(1);
@@ -938,6 +950,36 @@ const BOMB_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAABiCAYA
       br.tilt = Math.max(-1, Math.min(1, br.tilt));
       br.L.y = br.restY - br.tilt * BRIDGE_DIP;
       br.R.y = br.restY + br.tilt * BRIDGE_DIP;
+    }
+  }
+
+  // ボム飾り: 当たり判定はない見た目だけの存在だが、プレイヤーが触れると
+  // 後方(進行方向と逆)へ吹き飛ぶ演出を入れる。着地したらそこで静止する。
+  const BOMB_HIT_RADIUS = 30;
+  const BOMB_KNOCKBACK_VX = -260;
+  const BOMB_KNOCKBACK_VY = -420;
+  const BOMB_KNOCKBACK_GRAVITY = 1100;
+  function updateBombs(dt){
+    for(const b of activeBombs){
+      if(b.settled) continue;
+      if(!b.flying){
+        if(Math.abs(player.x - b.wx) < BOMB_HIT_RADIUS && player.y > b.groundY0 - 90){
+          b.flying = true;
+          b.vx = BOMB_KNOCKBACK_VX;
+          b.vy = BOMB_KNOCKBACK_VY;
+          b.vrot = -7;
+        }
+        continue;
+      }
+      b.vy += BOMB_KNOCKBACK_GRAVITY * dt;
+      b.wx += b.vx * dt;
+      b.wy += b.vy * dt;
+      b.rot += b.vrot * dt;
+      if(b.wy >= 0){
+        b.wy = 0;
+        b.vx = 0; b.vy = 0; b.vrot = 0;
+        b.settled = true;
+      }
     }
   }
 
@@ -1407,6 +1449,7 @@ const BOMB_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAABiCAYA
     }
 
     updateBridges(dt);
+    updateBombs(dt);
 
     if(!player.airborne){
       const info = groundInfoAt(player.x);
@@ -1950,7 +1993,7 @@ const BOMB_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAABiCAYA
   // 「乗ったら傾く橋」に木の板っぽい質感と支柱を追加する(現在の傾きに追従して描く)
   function drawBridgeDecor(){
     const DECK_H = 10;
-    const BRIDGE_GAP = 14; // 地面の崖と橋本体の間に開ける隙間(ワールドpx)
+    const BRIDGE_GAP = 26; // 地面の崖と橋本体の間に開ける隙間(ワールドpx)
     for(const br of activeBridges){
       // 崖際ぎりぎりまで板を伸ばすと地続きに見えてしまうので、L/R側は少しCに寄せて
       // 隙間を作る(Cは支点として固定なので動かさない。橋はL-C-Rが一直線のまま
@@ -1964,8 +2007,8 @@ const BOMB_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAABiCAYA
       const rx = rWorldX - camX, ry = rWorldY;
       ctx.save();
 
-      // 谷底へ向かって薄れていく支柱(地面とは別の、独立した吊り橋であることを示す)
-      [[lx, ly], [cx, cy], [rx, ry]].forEach(([px, py]) => {
+      // L/R側は谷底へ向かって薄れていく吊りワイヤー風の支え
+      [[lx, ly], [rx, ry]].forEach(([px, py]) => {
         const grad = ctx.createLinearGradient(0, py + DECK_H, 0, py + 80);
         grad.addColorStop(0, 'rgba(63,46,24,.85)');
         grad.addColorStop(1, 'rgba(63,46,24,0)');
@@ -1976,6 +2019,26 @@ const BOMB_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAABiCAYA
         ctx.lineTo(px, py + 80);
         ctx.stroke();
       });
+
+      // 中央(支点C)の真下は、宙に浮いて見えないよう不透明な支柱でしっかり支える
+      const pillarW = 12;
+      const pillarBottom = cy + 170;
+      ctx.fillStyle = '#5c4326';
+      ctx.strokeStyle = '#3f2e18';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.rect(cx - pillarW / 2, cy + DECK_H, pillarW, pillarBottom - (cy + DECK_H));
+      ctx.fill();
+      ctx.stroke();
+      // 支柱からL/R寄りの梁へ斜めに突っ張る筋交い(見た目の支持感を強める)
+      ctx.strokeStyle = '#3f2e18';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(cx - pillarW / 2, cy + DECK_H + 14);
+      ctx.lineTo(lx, ly + DECK_H + 30);
+      ctx.moveTo(cx + pillarW / 2, cy + DECK_H + 14);
+      ctx.lineTo(rx, ry + DECK_H + 30);
+      ctx.stroke();
 
       // 甲板本体(地面の色とは別の木の色で塗った、独立した板)
       ctx.fillStyle = '#8a6339';
@@ -2010,22 +2073,22 @@ const BOMB_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAABiCAYA
 
   // 当たり判定のない見た目だけのボム的なキャラクター(ユーザー提供のイラストをそのまま
   // 使用。背景の水色は透過処理済み。地面に立たせた状態で描く)
-  function drawBombChar(sx, groundY, scale){
+  function drawBombChar(sx, groundY, scale, rot){
     if(!(bombImg.complete && bombImg.naturalWidth)) return;
     const w = 70 * scale;
     const h = w * (bombImg.naturalHeight / bombImg.naturalWidth);
-    ctx.drawImage(bombImg, sx - w / 2, groundY - h, w, h);
+    ctx.save();
+    ctx.translate(sx, groundY - h / 2);
+    if(rot) ctx.rotate(rot);
+    ctx.drawImage(bombImg, -w / 2, -h / 2, w, h);
+    ctx.restore();
   }
 
   function drawBombDecor(){
-    const positions = STAGES[currentStageId].bombs;
-    if(!positions) return;
-    for(const bx of positions){
-      const sx = bx - camX;
+    for(const b of activeBombs){
+      const sx = b.wx - camX;
       if(sx < -60 || sx > 1020) continue;
-      const info = groundInfoAt(bx);
-      if(!info) continue;
-      drawBombChar(sx, info.y, 0.85 + hash01(bx) * 0.3);
+      drawBombChar(sx, b.groundY0 + b.wy, b.scale, b.flying ? b.rot : 0);
     }
   }
 
