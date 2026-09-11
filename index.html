@@ -175,6 +175,7 @@
             <p>自動走行、操作不要!<br>Space/タップ: ジャンプ(穴・障害物に注意)<br>←→: 空中姿勢制御(着地で加減速)<br>矢印キー: 選択 / Enter・Space: 決定</p>
             <button class="btn wide" id="rtaModeBtn" type="button">16枚RTAモード(開発中)</button>
             <button class="btn secondary wide" id="practiceStageBtn" type="button">検証用ステージ(10000m フラット)</button>
+            <button class="btn secondary wide" id="bridgeStageBtn" type="button">検証用ステージ: あしたのせんじょう(750m)</button>
             <button class="btn secondary wide" id="modeBackBtn" type="button">戻る</button>
           </div>
         </div>
@@ -245,7 +246,7 @@
 
 <script>
 (() => {
-  const GAME_VERSION = 'v0.3.14';
+  const GAME_VERSION = 'v0.4.0';
   // 「それで満足か?」ボイスをユーザー要望で10分だけ無効化(期限後は自動で元に戻る)
   const SUPPRESS_SATISFIED_LINE_UNTIL = new Date('2026-09-10T12:58:30Z').getTime();
   document.getElementById('versionLabel').textContent = GAME_VERSION;
@@ -410,6 +411,7 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
   const modeSelectPanelEl = document.getElementById('modeSelectPanel');
   const rtaModeBtnEl = document.getElementById('rtaModeBtn');
   const practiceStageBtnEl = document.getElementById('practiceStageBtn');
+  const bridgeStageBtnEl = document.getElementById('bridgeStageBtn');
   const modeBackBtnEl = document.getElementById('modeBackBtn');
   const stage1BtnEl = document.getElementById('stage1Btn');
   const stage2BtnEl = document.getElementById('stage2Btn');
@@ -420,7 +422,7 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
   let startFocusIndex = 0;
   function getStartFocusables(){
     if(!defaultStartPanelEl.classList.contains('hidden')) return [stage1BtnEl, stage2BtnEl];
-    return [rtaModeBtnEl, practiceStageBtnEl, modeBackBtnEl];
+    return [rtaModeBtnEl, practiceStageBtnEl, bridgeStageBtnEl, modeBackBtnEl];
   }
   function updateStartFocus(){
     getStartFocusables().forEach((btn, i) => {
@@ -786,6 +788,65 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
         backdrop: 'garden', decor: 'none', snow: false,
       },
     },
+    4: {
+      name: 'あしたのせんじょう',
+      practice: true, // 未公開の検証ステージ。16枚RTAのコース順には含めず、D+Fのモード選択画面からのみ入れる
+      goalX: 7500, // 750m
+      // ギミック: 「乗ったら傾く橋」。bridge:同一id を持つ3点(bridgeRole: L/C/R)を
+      // 1組として定義すると、実行中はプレイヤーが乗っている側がシーソーのように沈み、
+      // 反対側が持ち上がる(updateBridges()参照)。C(中央支点)の高さは常に固定。
+      terrain: [
+        { x: 0,    y: GROUND_BASE },
+        { x: 400,  y: GROUND_BASE },        // 平坦なスタート区間
+        { x: 650,  y: GROUND_BASE + 40 },
+        { x: 900,  y: GROUND_BASE - 10 },
+        { x: 1150, y: GROUND_BASE - 40, gapAfter: true }, // 落下穴1
+        { x: 1290, y: GROUND_BASE - 10 },
+        { x: 1450, y: GROUND_BASE, bridge: 'b1', bridgeRole: 'L' },  // 傾く橋1(手前)
+        { x: 1600, y: GROUND_BASE, bridge: 'b1', bridgeRole: 'C' },  // 傾く橋1(支点)
+        { x: 1750, y: GROUND_BASE, bridge: 'b1', bridgeRole: 'R' },  // 傾く橋1(奥)
+        { x: 1900, y: GROUND_BASE },
+        { x: 2150, y: GROUND_BASE - 10 },
+        { x: 2400, y: GROUND_BASE - 40, gapAfter: true }, // 落下穴2
+        { x: 2540, y: GROUND_BASE - 10 },
+        { x: 2850, y: GROUND_BASE + 30 },
+        { x: 3150, y: GROUND_BASE - 20 },
+        { x: 3400, y: GROUND_BASE - 10 },
+        { x: 3650, y: GROUND_BASE - 40, gapAfter: true }, // 落下穴3
+        { x: 3790, y: GROUND_BASE - 10 },
+        { x: 3950, y: GROUND_BASE },
+        { x: 4020, y: GROUND_BASE, bridge: 'b2', bridgeRole: 'L' },  // 傾く橋2(幅広め・より大きく傾く)
+        { x: 4200, y: GROUND_BASE, bridge: 'b2', bridgeRole: 'C' },
+        { x: 4380, y: GROUND_BASE, bridge: 'b2', bridgeRole: 'R' },
+        { x: 4530, y: GROUND_BASE },
+        { x: 4780, y: GROUND_BASE - 10 },
+        { x: 5030, y: GROUND_BASE - 40, gapAfter: true }, // 落下穴4
+        { x: 5170, y: GROUND_BASE - 10 },
+        { x: 5450, y: GROUND_BASE + 20 },
+        { x: 5700, y: GROUND_BASE - 30 },
+        { x: 5900, y: GROUND_BASE - 10 },
+        { x: 6150, y: GROUND_BASE - 40, gapAfter: true }, // 落下穴5
+        { x: 6290, y: GROUND_BASE - 10 },
+        { x: 6500, y: GROUND_BASE - 10 },
+        { x: 6750, y: GROUND_BASE - 40, gapAfter: true }, // 落下穴6
+        { x: 6890, y: GROUND_BASE - 10 },
+        { x: 7150, y: GROUND_BASE },
+        { x: 7500, y: GROUND_BASE }, // goal
+      ],
+      obstacles: [
+        { x: 520,  w: 26, h: 24 },
+        { x: 2900, w: 28, h: 24 },
+        { x: 5500, w: 24, h: 22 },
+        { x: 7200, w: 26, h: 24 },
+      ],
+      theme: {
+        sky: ['#4a3a5c', '#d98a4a'],
+        groundFill: '#6b5a45', groundStroke: '#3f3327',
+        iceFill: '#cdeffd', iceStroke: '#7fd6f5',
+        obstacleFill: '#5a5048', obstacleStroke: '#332c26',
+        backdrop: 'castle', decor: 'none', snow: false,
+      },
+    },
   };
   // ステージが増えるたびにSTAGESへ追記すれば、16枚RTAモードは自動でその順番を通しでプレイする
   // (practice:trueの検証用ステージはRTAの通し順には含めない)
@@ -797,6 +858,7 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
   let runMode = 'single'; // 'single' | 'rta'
   let rtaStageIndex = 0;  // RTA中、STAGE_ORDER上の現在位置
   let rtaTotalElapsed = 0; // RTA中、クリア済みステージの合計タイム(秒)
+  let activeBridges = []; // 現在のステージの「乗ったら傾く橋」(updateBridges()参照)
 
   function loadStage(id){
     const s = STAGES[id];
@@ -808,6 +870,20 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
     // 星を配置するステージは、星に触れた時点でゴール扱いにする(星が無ければ従来通りGOAL_Xで判定)
     STAR_X = (s.starX !== undefined) ? s.starX : s.goalX;
     stageLabelEl.textContent = s.name;
+
+    // bridge:同一id(bridgeRole: L/C/R)の3点セットを検出し、傾き状態をリセットする
+    const bridgeMap = {};
+    terrain.forEach(p => {
+      if(!p.bridge) return;
+      if(!bridgeMap[p.bridge]) bridgeMap[p.bridge] = {};
+      bridgeMap[p.bridge][p.bridgeRole] = p;
+    });
+    activeBridges = Object.values(bridgeMap).filter(b => b.L && b.C && b.R).map(b => {
+      const restY = b.C.y;
+      b.L.y = restY;
+      b.R.y = restY;
+      return { L: b.L, C: b.C, R: b.R, restY, tilt: 0 };
+    });
   }
   loadStage(1);
 
@@ -818,6 +894,7 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
   stage1BtnEl.addEventListener('click', () => { updateDebugUnlockOnFreshStart(); selectedStageId = 1; startGame(); });
   stage2BtnEl.addEventListener('click', () => { updateDebugUnlockOnFreshStart(); selectedStageId = 2; startGame(); });
   practiceStageBtnEl.addEventListener('click', () => { updateDebugUnlockOnFreshStart(); selectedStageId = 3; startGame(); });
+  bridgeStageBtnEl.addEventListener('click', () => { updateDebugUnlockOnFreshStart(); selectedStageId = 4; startGame(); });
 
   function findSegment(x){
     for(let i = 0; i < terrain.length - 1; i++){
@@ -835,6 +912,21 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
     const y = a.y + (b.y - a.y) * t;
     const angle = Math.atan2(b.y - a.y, b.x - a.x);
     return { y, angle, ice: !!a.ice, iceberg: !!a.iceberg };
+  }
+
+  // 「乗ったら傾く橋」: プレイヤーが橋の左右どちらの半分に乗っているかでシーソーのように
+  // 傾き、離れると水平に戻る。L/Rのyだけを毎フレーム書き換える(Cは支点として固定)。
+  const BRIDGE_DIP = 55;             // 最大まで傾いたときの高低差(px)
+  const BRIDGE_TILT_RESPONSE = 2.2;  // 目標の傾きへ追従する速さ(大きいほど素早く傾く)
+  function updateBridges(dt){
+    for(const br of activeBridges){
+      const occupied = !player.airborne && player.x >= br.L.x && player.x <= br.R.x;
+      const target = !occupied ? 0 : (player.x <= br.C.x ? -1 : 1);
+      br.tilt += (target - br.tilt) * BRIDGE_TILT_RESPONSE * dt;
+      br.tilt = Math.max(-1, Math.min(1, br.tilt));
+      br.L.y = br.restY - br.tilt * BRIDGE_DIP;
+      br.R.y = br.restY + br.tilt * BRIDGE_DIP;
+    }
   }
 
   // ---------- Physics constants ----------
@@ -1301,6 +1393,8 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
       d.vy += 40 * dt;
       if(d.life <= 0) dustPuffs.splice(i, 1);
     }
+
+    updateBridges(dt);
 
     if(!player.airborne){
       const info = groundInfoAt(player.x);
@@ -1822,6 +1916,36 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
     }
   }
 
+  // 「乗ったら傾く橋」に木の板っぽい質感と支柱を追加する(現在の傾きに追従して描く)
+  function drawBridgeDecor(){
+    for(const br of activeBridges){
+      const lx = br.L.x - camX, ly = br.L.y;
+      const cx = br.C.x - camX, cy = br.C.y;
+      const rx = br.R.x - camX, ry = br.R.y;
+      ctx.save();
+      ctx.strokeStyle = '#5c4326';
+      ctx.lineWidth = 2;
+      const plankGap = 18;
+      for(let t = 0; t <= 1; t += plankGap / (br.R.x - br.L.x)){
+        const px = lx + (rx - lx) * t;
+        const py = ly + (ry - ly) * t;
+        ctx.beginPath();
+        ctx.moveTo(px, py);
+        ctx.lineTo(px, py + 6);
+        ctx.stroke();
+      }
+      ctx.strokeStyle = '#3f2e18';
+      ctx.lineWidth = 3;
+      [[lx, ly], [cx, cy], [rx, ry]].forEach(([px, py]) => {
+        ctx.beginPath();
+        ctx.moveTo(px, py);
+        ctx.lineTo(px, py + 16);
+        ctx.stroke();
+      });
+      ctx.restore();
+    }
+  }
+
   function drawCastleBackdrop(){
     // マリオ64のピーチ城の庭っぽい遠景(オリジナル画で再現。実際の画像素材は使用していない)
     const parallaxSky = 0.1, parallaxHill = 0.25;
@@ -2336,6 +2460,7 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
 
     if(THEME.backdrop === 'mountain') drawMountainBackdrop(); else drawCastleBackdrop();
     drawGround();
+    drawBridgeDecor();
     drawObstacles();
     drawGoalStar(now);
     drawPipe();
