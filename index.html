@@ -246,7 +246,7 @@
 
 <script>
 (() => {
-  const GAME_VERSION = 'v0.4.2';
+  const GAME_VERSION = 'v0.4.3';
   // 「それで満足か?」ボイスをユーザー要望で10分だけ無効化(期限後は自動で元に戻る)
   const SUPPRESS_SATISFIED_LINE_UNTIL = new Date('2026-09-10T12:58:30Z').getTime();
   document.getElementById('versionLabel').textContent = GAME_VERSION;
@@ -601,6 +601,10 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
         rankingViewStageId = STAGE_ORDER[(idx + dir + STAGE_ORDER.length) % STAGE_ORDER.length];
         renderRankingList();
       }
+      return;
+    }
+    if(!settingsOverlayEl.classList.contains('hidden')){
+      if(e.code === 'Escape'){ e.preventDefault(); closeSettings(); }
       return;
     }
     const action = actionForCode(e.code);
