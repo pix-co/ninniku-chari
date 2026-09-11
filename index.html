@@ -246,7 +246,7 @@
 
 <script>
 (() => {
-  const GAME_VERSION = 'v0.4.1';
+  const GAME_VERSION = 'v0.4.2';
   // 「それで満足か?」ボイスをユーザー要望で10分だけ無効化(期限後は自動で元に戻る)
   const SUPPRESS_SATISFIED_LINE_UNTIL = new Date('2026-09-10T12:58:30Z').getTime();
   document.getElementById('versionLabel').textContent = GAME_VERSION;
@@ -839,6 +839,8 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
         { x: 5500, w: 24, h: 22 },
         { x: 7200, w: 26, h: 24 },
       ],
+      // 当たり判定のない見た目だけの飾り(ボム的なキャラクター)を、ところどころに配置する
+      bombs: [850, 2050, 3300, 4650, 5850, 6420, 7050],
       theme: {
         sky: ['#4a3a5c', '#d98a4a'],
         groundFill: '#6b5a45', groundStroke: '#3f3327',
@@ -1986,6 +1988,89 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
     }
   }
 
+  // 当たり判定のない見た目だけのボム的なキャラクター(ユーザー提供のイラストを元にした
+  // オリジナルの手描き風キャラクター。背景色は使わず、地面に立たせた状態で描く)
+  function drawBombChar(sx, groundY, scale){
+    const r = 30 * scale;
+    const cx = sx, cy = groundY - r * 0.85;
+    ctx.save();
+
+    // 足(黄色い楕円)
+    ctx.fillStyle = '#F4C430';
+    ctx.strokeStyle = '#8a6a10';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.ellipse(cx - r * 0.5, groundY - r * 0.14, r * 0.4, r * 0.22, -0.25, 0, Math.PI * 2);
+    ctx.fill(); ctx.stroke();
+    ctx.beginPath();
+    ctx.ellipse(cx + r * 0.5, groundY - r * 0.14, r * 0.4, r * 0.22, 0.25, 0, Math.PI * 2);
+    ctx.fill(); ctx.stroke();
+
+    // 導火線の火(オレンジのギザギザ)
+    const fx = cx + r * 0.15, fy = cy - r - 20;
+    ctx.fillStyle = '#e8631f';
+    ctx.beginPath();
+    ctx.moveTo(fx, fy - 8);
+    ctx.lineTo(fx + 6, fy - 2);
+    ctx.lineTo(fx + 10, fy - 10);
+    ctx.lineTo(fx + 4, fy + 2);
+    ctx.lineTo(fx + 9, fy + 6);
+    ctx.lineTo(fx - 2, fy + 4);
+    ctx.closePath();
+    ctx.fill();
+
+    // 導火線(茶色い線)と受け皿(シルバー)
+    ctx.strokeStyle = '#7a5a34';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - r);
+    ctx.quadraticCurveTo(cx + r * 0.3, cy - r - 12, fx, fy);
+    ctx.stroke();
+    ctx.fillStyle = '#c9c9c9';
+    ctx.strokeStyle = '#8a8a8a';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy - r, 9, 5, 0, 0, Math.PI * 2);
+    ctx.fill(); ctx.stroke();
+
+    // 胴体(黒い球体)
+    ctx.fillStyle = '#161616';
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fill(); ctx.stroke();
+
+    // ほお(グレーの陰)
+    ctx.fillStyle = 'rgba(150,150,150,.6)';
+    ctx.beginPath();
+    ctx.ellipse(cx + r * 0.3, cy + r * 0.08, r * 0.16, r * 0.11, 0.3, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 目(白い縦長の楕円)
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.ellipse(cx - r * 0.42, cy - r * 0.05, r * 0.13, r * 0.24, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(cx - r * 0.1, cy - r * 0.05, r * 0.13, r * 0.24, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+  }
+
+  function drawBombDecor(){
+    const positions = STAGES[currentStageId].bombs;
+    if(!positions) return;
+    for(const bx of positions){
+      const sx = bx - camX;
+      if(sx < -60 || sx > 1020) continue;
+      const info = groundInfoAt(bx);
+      if(!info) continue;
+      drawBombChar(sx, info.y, 0.85 + hash01(bx) * 0.3);
+    }
+  }
+
   function drawBattlefieldBackdrop(){
     // 「あしたのせんじょう」用の遠景: 庭園ではなく、夕暮れの荒れた戦場らしい遠景にする
     // (ニンニクガーデン=drawCastleBackdropの緑の丘・お城とはっきり見分けがつくように)
@@ -2564,6 +2649,7 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
     else drawCastleBackdrop();
     drawGround();
     drawBridgeDecor();
+    drawBombDecor();
     drawObstacles();
     drawGoalStar(now);
     drawPipe();
