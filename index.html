@@ -246,7 +246,7 @@
 
 <script>
 (() => {
-  const GAME_VERSION = 'v0.4.10';
+  const GAME_VERSION = 'v0.4.11';
   // 「それで満足か?」ボイスをユーザー要望で10分だけ無効化(期限後は自動で元に戻る)
   const SUPPRESS_SATISFIED_LINE_UNTIL = new Date('2026-09-10T12:58:30Z').getTime();
   document.getElementById('versionLabel').textContent = GAME_VERSION;
@@ -916,6 +916,7 @@ const BOMB_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAABiCAYA
         wx: bx, groundY0: info ? info.y : GROUND_BASE,
         scale: 0.85 + hash01(bx) * 0.3,
         cooldown: 0, speechTimer: 0,
+        walkPhase: hash01(bx + 1) * Math.PI * 2, // 足並みが揃わないよう個体ごとに位相をずらす
       };
     });
   }
@@ -2119,12 +2120,19 @@ const BOMB_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAABiCAYA
     ctx.restore();
   }
 
-  function drawBombDecor(){
+  // テクテク歩いてるように見せるための、その場足踏みの弾みと左右の重心移動
+  const BOMB_WALK_CYCLE_MS = 260;
+  const BOMB_WALK_BOB = 4;
+  const BOMB_WALK_SWAY = 3;
+  function drawBombDecor(now){
     for(const b of activeBombs){
       const sx = b.wx - camX;
       if(sx < -60 || sx > 1020) continue;
-      const h = drawBombChar(sx, b.groundY0, b.scale);
-      if(b.speechTimer > 0) drawBombSpeech(sx, b.groundY0 - (h || 60), b.speechTimer);
+      const t = now / BOMB_WALK_CYCLE_MS + b.walkPhase;
+      const bob = Math.abs(Math.sin(t)) * BOMB_WALK_BOB * b.scale;
+      const sway = Math.sin(t * 2) * BOMB_WALK_SWAY * b.scale;
+      const h = drawBombChar(sx + sway, b.groundY0 - bob, b.scale);
+      if(b.speechTimer > 0) drawBombSpeech(sx + sway, b.groundY0 - bob - (h || 60), b.speechTimer);
     }
   }
 
@@ -2706,7 +2714,7 @@ const BOMB_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAABiCAYA
     else drawCastleBackdrop();
     drawGround();
     drawBridgeDecor();
-    drawBombDecor();
+    drawBombDecor(now);
     drawObstacles();
     drawGoalStar(now);
     drawPipe();
