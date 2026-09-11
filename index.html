@@ -246,7 +246,7 @@
 
 <script>
 (() => {
-  const GAME_VERSION = 'v0.4.0';
+  const GAME_VERSION = 'v0.4.1';
   // 「それで満足か?」ボイスをユーザー要望で10分だけ無効化(期限後は自動で元に戻る)
   const SUPPRESS_SATISFIED_LINE_UNTIL = new Date('2026-09-10T12:58:30Z').getTime();
   document.getElementById('versionLabel').textContent = GAME_VERSION;
@@ -844,7 +844,7 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
         groundFill: '#6b5a45', groundStroke: '#3f3327',
         iceFill: '#cdeffd', iceStroke: '#7fd6f5',
         obstacleFill: '#5a5048', obstacleStroke: '#332c26',
-        backdrop: 'castle', decor: 'none', snow: false,
+        backdrop: 'battlefield', decor: 'none', snow: false,
       },
     },
   };
@@ -1737,6 +1737,11 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
       hideScoreSubmit();
       rankResultTextEl.textContent = 'デバッグモード中はランキング登録できません';
       rankResultTextEl.classList.remove('hidden');
+    } else if(STAGES[currentStageId].practice){
+      // お試し/検証用ステージはランキング集計の対象外
+      hideScoreSubmit();
+      rankResultTextEl.textContent = 'お試しステージのためランキング登録はできません';
+      rankResultTextEl.classList.remove('hidden');
     } else {
       showScoreSubmit(finalMs);
       checkAndShowRank(finalMs, currentStageId);
@@ -1756,6 +1761,14 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
   }
   const ICEBERG_SPACING = 55;
 
+  // 「乗ったら傾く橋」の両端(L/R)は地面の輪郭としては傾かない基準の高さの崖として
+  // 扱う(橋そのものは地面と切り離してdrawBridgeDecorが独立して描く)
+  function groundContourY(p){
+    if(!p.bridge) return p.y;
+    const br = activeBridges.find(b => b.L === p || b.R === p);
+    return br ? br.restY : p.y;
+  }
+
   function drawGround(){
     ctx.fillStyle = THEME.groundFill;
     ctx.strokeStyle = THEME.groundStroke;
@@ -1765,10 +1778,12 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
     ctx.beginPath();
     for(let i = 0; i < terrain.length; i++){
       const p = terrain[i];
+      if(p.bridgeRole === 'C') continue; // 橋の支点は地面の輪郭には含めない(谷になる)
       const sx = p.x - camX;
-      if(!drawing){ ctx.moveTo(sx, p.y); drawing = true; chunkStartSx = sx; }
-      else ctx.lineTo(sx, p.y);
-      if(p.gapAfter){
+      const gy = groundContourY(p);
+      if(!drawing){ ctx.moveTo(sx, gy); drawing = true; chunkStartSx = sx; }
+      else ctx.lineTo(sx, gy);
+      if(p.gapAfter || p.bridgeRole === 'L'){
         // close and fill this ground chunk (flat bottom back to this chunk's
         // own start — NOT terrain[0] — otherwise closePath() connects the
         // gap edge diagonally back up to the start's surface height instead
@@ -1793,9 +1808,11 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
     drawing = false;
     for(let i = 0; i < terrain.length; i++){
       const p = terrain[i];
+      if(p.bridgeRole === 'C') continue;
       const sx = p.x - camX;
-      if(!drawing){ ctx.moveTo(sx, p.y); drawing = true; } else ctx.lineTo(sx, p.y);
-      if(p.gapAfter){ ctx.stroke(); ctx.beginPath(); drawing = false; }
+      const gy = groundContourY(p);
+      if(!drawing){ ctx.moveTo(sx, gy); drawing = true; } else ctx.lineTo(sx, gy);
+      if(p.gapAfter || p.bridgeRole === 'L'){ ctx.stroke(); ctx.beginPath(); drawing = false; }
     }
     ctx.stroke();
 
@@ -1918,11 +1935,42 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
 
   // 「乗ったら傾く橋」に木の板っぽい質感と支柱を追加する(現在の傾きに追従して描く)
   function drawBridgeDecor(){
+    const DECK_H = 10;
     for(const br of activeBridges){
       const lx = br.L.x - camX, ly = br.L.y;
       const cx = br.C.x - camX, cy = br.C.y;
       const rx = br.R.x - camX, ry = br.R.y;
       ctx.save();
+
+      // 谷底へ向かって薄れていく支柱(地面とは別の、独立した吊り橋であることを示す)
+      [[lx, ly], [cx, cy], [rx, ry]].forEach(([px, py]) => {
+        const grad = ctx.createLinearGradient(0, py + DECK_H, 0, py + 80);
+        grad.addColorStop(0, 'rgba(63,46,24,.85)');
+        grad.addColorStop(1, 'rgba(63,46,24,0)');
+        ctx.strokeStyle = grad;
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(px, py + DECK_H);
+        ctx.lineTo(px, py + 80);
+        ctx.stroke();
+      });
+
+      // 甲板本体(地面の色とは別の木の色で塗った、独立した板)
+      ctx.fillStyle = '#8a6339';
+      ctx.strokeStyle = '#3f2e18';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(lx, ly);
+      ctx.lineTo(cx, cy);
+      ctx.lineTo(rx, ry);
+      ctx.lineTo(rx, ry + DECK_H);
+      ctx.lineTo(cx, cy + DECK_H);
+      ctx.lineTo(lx, ly + DECK_H);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // 板目の質感
       ctx.strokeStyle = '#5c4326';
       ctx.lineWidth = 2;
       const plankGap = 18;
@@ -1931,19 +1979,72 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
         const py = ly + (ry - ly) * t;
         ctx.beginPath();
         ctx.moveTo(px, py);
-        ctx.lineTo(px, py + 6);
+        ctx.lineTo(px, py + DECK_H);
         ctx.stroke();
       }
-      ctx.strokeStyle = '#3f2e18';
-      ctx.lineWidth = 3;
-      [[lx, ly], [cx, cy], [rx, ry]].forEach(([px, py]) => {
-        ctx.beginPath();
-        ctx.moveTo(px, py);
-        ctx.lineTo(px, py + 16);
-        ctx.stroke();
-      });
       ctx.restore();
     }
+  }
+
+  function drawBattlefieldBackdrop(){
+    // 「あしたのせんじょう」用の遠景: 庭園ではなく、夕暮れの荒れた戦場らしい遠景にする
+    // (ニンニクガーデン=drawCastleBackdropの緑の丘・お城とはっきり見分けがつくように)
+    const parallaxSky = 0.1, parallaxHill = 0.25;
+
+    // 不穏な雲(白ではなく暗い灰紫)
+    ctx.fillStyle = 'rgba(60,50,72,.6)';
+    const cloudBaseX = -((camX * parallaxSky) % 340);
+    for(let i = -1; i < 5; i++){
+      const cx = cloudBaseX + i * 340;
+      const cy = 60 + (i % 2) * 26;
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, 46, 14, 0, 0, Math.PI * 2);
+      ctx.ellipse(cx + 34, cy + 5, 30, 11, 0, 0, Math.PI * 2);
+      ctx.ellipse(cx - 30, cy + 6, 26, 10, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // 遠くの丘(緑ではなく焼け焦げた土色)
+    const hillBaseX = -((camX * parallaxHill) % 480);
+    ctx.fillStyle = '#5a4632';
+    for(let i = -1; i < 4; i++){
+      const hx = hillBaseX + i * 480;
+      ctx.beginPath();
+      ctx.moveTo(hx - 40, GROUND_BASE);
+      ctx.quadraticCurveTo(hx + 140, GROUND_BASE - 90, hx + 320, GROUND_BASE);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    // 折れた槍と破れた旗のシルエット(ゴール手前に固定表示)
+    const markerWorldX = GOAL_X - 190;
+    const mx = markerWorldX - camX;
+    const baseY = GROUND_BASE;
+    ctx.strokeStyle = '#3a2f22';
+    ctx.lineWidth = 4;
+    [[-40, 90], [0, 130], [42, 100]].forEach(([dx, h], i) => {
+      const tilt = (i - 1) * 8;
+      ctx.beginPath();
+      ctx.moveTo(mx + dx, baseY);
+      ctx.lineTo(mx + dx + tilt, baseY - h);
+      ctx.stroke();
+      ctx.fillStyle = '#8a8a8a';
+      ctx.beginPath();
+      ctx.moveTo(mx + dx + tilt, baseY - h);
+      ctx.lineTo(mx + dx + tilt - 6, baseY - h + 16);
+      ctx.lineTo(mx + dx + tilt + 6, baseY - h + 16);
+      ctx.closePath();
+      ctx.fill();
+    });
+    ctx.fillStyle = '#8a2f1f';
+    ctx.beginPath();
+    ctx.moveTo(mx + 8, baseY - 122);
+    ctx.lineTo(mx + 46, baseY - 108);
+    ctx.lineTo(mx + 26, baseY - 98);
+    ctx.lineTo(mx + 42, baseY - 86);
+    ctx.lineTo(mx + 8, baseY - 80);
+    ctx.closePath();
+    ctx.fill();
   }
 
   function drawCastleBackdrop(){
@@ -2458,7 +2559,9 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, 960, 540);
 
-    if(THEME.backdrop === 'mountain') drawMountainBackdrop(); else drawCastleBackdrop();
+    if(THEME.backdrop === 'mountain') drawMountainBackdrop();
+    else if(THEME.backdrop === 'battlefield') drawBattlefieldBackdrop();
+    else drawCastleBackdrop();
     drawGround();
     drawBridgeDecor();
     drawObstacles();
