@@ -68,8 +68,6 @@
   .canvas-area{ position:relative; }
   canvas{ display:block; width:960px; height:540px; background:#8fd0f2; border-radius:10px; touch-action:none; }
   #buttonPanel{ margin-top:10px; }
-  #hud{ position:absolute; top:20px; left:20px; right:20px; display:flex; justify-content:space-between; pointer-events:none; color:#fff; text-shadow:0 1px 3px rgba(0,0,0,.6); font-size:15px; font-weight:bold; }
-  #hud .box{ background:rgba(0,0,0,.35); padding:6px 12px; border-radius:8px; }
   #timeHud{ position:absolute; top:54px; right:20px; color:#fff; text-shadow:0 1px 3px rgba(0,0,0,.6); font-size:15px; font-weight:bold; pointer-events:none; }
   button{ font-family:'Zen Maru Gothic', sans-serif; cursor:pointer; }
   .btn{
@@ -150,10 +148,6 @@
   <div class="board-shell">
     <div class="canvas-area">
       <canvas id="game" width="960" height="540"></canvas>
-      <div id="hud">
-        <div class="box">速度: <span id="speedVal">0</span> km/h</div>
-        <div class="box">距離: <span id="distVal">0</span> / <span id="distTotal">0</span> m</div>
-      </div>
       <div id="timeHud" class="box">タイム: <span id="timeVal">0.00</span> 秒</div>
       <div id="stageLabel" class="box" style="position:absolute; top:20px; left:50%; transform:translateX(-50%); pointer-events:none;"></div>
       <div id="progressWrap"><div id="progressBar"></div></div>
@@ -251,7 +245,7 @@
 
 <script>
 (() => {
-  const GAME_VERSION = 'v0.3.13';
+  const GAME_VERSION = 'v0.3.14';
   // 「それで満足か?」ボイスをユーザー要望で10分だけ無効化(期限後は自動で元に戻る)
   const SUPPRESS_SATISFIED_LINE_UNTIL = new Date('2026-09-10T12:58:30Z').getTime();
   document.getElementById('versionLabel').textContent = GAME_VERSION;
@@ -305,9 +299,6 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
     try{ rec.stop(); }catch(e){ /* ignore */ }
   }
   const wrapEl = document.getElementById('wrap');
-  const speedValEl = document.getElementById('speedVal');
-  const distValEl = document.getElementById('distVal');
-  const distTotalEl = document.getElementById('distTotal');
   const timeValEl = document.getElementById('timeVal');
   const progressBarEl = document.getElementById('progressBar');
   const headerMascotImgEl = document.getElementById('headerMascotImg');
@@ -1021,10 +1012,7 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
     goalOverlayEl.classList.add('hidden');
     pauseOverlayEl.classList.add('hidden');
     hideScoreSubmit();
-    distTotalEl.textContent = Math.round(GOAL_X / 10);
     timeValEl.textContent = '0.00';
-    speedValEl.textContent = '0';
-    distValEl.textContent = '0';
     progressBarEl.style.width = '0%';
     Object.assign(taDebugState, { frame: '0', chain: '-', chainPct: 0, landFrame: '-', rejump: '-', landBuff: '-', tripleBoost: '-', combo: '-' });
     lastLandFrame = null;
@@ -1381,8 +1369,6 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
     }
 
     camX = Math.max(0, player.x - 260);
-    speedValEl.textContent = Math.round(player.speed * 0.18); // arbitrary km/h scaling
-    distValEl.textContent = Math.round(player.x / 10);
     timeValEl.textContent = (runMode === 'rta' ? rtaTotalElapsed + elapsed : elapsed).toFixed(2);
     progressBarEl.style.width = Math.min(100, (player.x / STAR_X) * 100) + '%';
 
@@ -2370,10 +2356,38 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
 
     drawComboPopup();
     if(THEME.snow) drawSnowfall(now);
-    // 押してるボタン(ジャンプ・左右)は録画にも残したいので、デバッグモードに
+    // 押してるボタン(ジャンプ・左右)・速度・距離は録画にも残したいので、デバッグモードに
     // 関係なく常にcanvasへ描画する(DOM要素はcanvas.captureStream()の録画に写らない)
+    drawStatsOverlay();
     drawInputDisplayOverlay();
     drawTaDebugOverlay();
+  }
+
+  function drawStatsOverlay(){
+    const speedText = '速度: ' + Math.round(player.speed * 0.18) + ' km/h';
+    const distText = '距離: ' + Math.round(player.x / 10) + ' / ' + Math.round(GOAL_X / 10) + ' m';
+    ctx.save();
+    ctx.font = 'bold 15px "Yu Gothic", Meiryo, sans-serif';
+    ctx.textBaseline = 'middle';
+    const padX = 12, padY = 6, boxH = 15 + padY * 2, boxY = 20;
+    const drawBox = (text, edgeX, alignLeft) => {
+      const w = ctx.measureText(text).width + padX * 2;
+      const boxX = alignLeft ? edgeX : edgeX - w;
+      ctx.fillStyle = 'rgba(0,0,0,.35)';
+      if(ctx.roundRect){
+        ctx.beginPath();
+        ctx.roundRect(boxX, boxY, w, boxH, 8);
+        ctx.fill();
+      } else {
+        ctx.fillRect(boxX, boxY, w, boxH);
+      }
+      ctx.fillStyle = '#fff';
+      ctx.textAlign = 'left';
+      ctx.fillText(text, boxX + padX, boxY + boxH / 2 + 1);
+    };
+    drawBox(speedText, 20, true);
+    drawBox(distText, 940, false);
+    ctx.restore();
   }
 
   // デバッグモード中のTA表示をcanvas上にも描画する(DOM要素はcanvas.captureStream()の
@@ -2581,7 +2595,6 @@ const PENGUIN_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAsgAAALIC
   }, { passive: false });
 
   resetPlayer();
-  distTotalEl.textContent = Math.round(GOAL_X / 10);
   fitToWindow();
   requestAnimationFrame(loop);
 })();
