@@ -246,7 +246,7 @@
 
 <script>
 (() => {
-  const GAME_VERSION = 'v0.4.9';
+  const GAME_VERSION = 'v0.4.10';
   // 「それで満足か?」ボイスをユーザー要望で10分だけ無効化(期限後は自動で元に戻る)
   const SUPPRESS_SATISFIED_LINE_UNTIL = new Date('2026-09-10T12:58:30Z').getTime();
   document.getElementById('versionLabel').textContent = GAME_VERSION;
@@ -263,17 +263,28 @@ const BOMB_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAABiCAYA
 
   // ---------- プレイ録画(記録が出た走りを見直せるように) ----------
   // canvasの描画をそのままMediaRecorderで動画化する。専用のサーバーや
-  // 保存先は無く、その場でwebmファイルとしてダウンロードするだけ。
+  // 保存先は無く、その場でファイルとしてダウンロードするだけ。
+  // ブラウザがMediaRecorderでのmp4直接収録に対応していればmp4を、
+  // 対応していなければwebmにフォールバックする(対応状況はブラウザ次第)。
   const RECORDING_SUPPORTED = typeof canvas.captureStream === 'function' && typeof window.MediaRecorder === 'function';
   let mediaRecorder = null;
   let recordedChunks = [];
   let lastRecordingBlob = null;
   function pickRecorderMimeType(){
-    const candidates = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
+    const candidates = [
+      'video/mp4;codecs=avc1',
+      'video/mp4',
+      'video/webm;codecs=vp9',
+      'video/webm;codecs=vp8',
+      'video/webm',
+    ];
     for(const t of candidates){
       if(window.MediaRecorder.isTypeSupported && window.MediaRecorder.isTypeSupported(t)) return t;
     }
     return '';
+  }
+  function recordingFileExtension(mimeType){
+    return (mimeType || '').indexOf('mp4') !== -1 ? 'mp4' : 'webm';
   }
   function startRecording(){
     saveRecordingBtnEl.classList.add('hidden');
@@ -2912,7 +2923,7 @@ const BOMB_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAABiCAYA
     const url = URL.createObjectURL(lastRecordingBlob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'ninniku-chari-' + Date.now() + '.webm';
+    a.download = 'ninniku-chari-' + Date.now() + '.' + recordingFileExtension(lastRecordingBlob.type);
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
