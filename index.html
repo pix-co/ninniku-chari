@@ -246,7 +246,7 @@
 
 <script>
 (() => {
-  const GAME_VERSION = 'v0.4.7';
+  const GAME_VERSION = 'v0.4.8';
   // 「それで満足か?」ボイスをユーザー要望で10分だけ無効化(期限後は自動で元に戻る)
   const SUPPRESS_SATISFIED_LINE_UNTIL = new Date('2026-09-10T12:58:30Z').getTime();
   document.getElementById('versionLabel').textContent = GAME_VERSION;
@@ -898,13 +898,13 @@ const BOMB_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAABiCAYA
       return { L: b.L, C: b.C, R: b.R, restY, tilt: 0 };
     });
 
-    // ボム飾り: ヒットクールダウンをステージごとに持ち直す
+    // ボム飾り: ヒットクールダウンと吹き出し表示をステージごとに持ち直す
     activeBombs = (s.bombs || []).map(bx => {
       const info = groundInfoAt(bx);
       return {
         wx: bx, groundY0: info ? info.y : GROUND_BASE,
         scale: 0.85 + hash01(bx) * 0.3,
-        cooldown: 0,
+        cooldown: 0, speechTimer: 0,
       };
     });
   }
@@ -958,8 +958,11 @@ const BOMB_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAABiCAYA
   const BOMB_KNOCKBACK_VX = -260;      // 後方への吹っ飛び速度(px/s)
   const BOMB_KNOCKBACK_VY_MUL = 1.3;   // JUMP_IMPULSE基準の打ち上げ倍率
   const BOMB_COOLDOWN_MS = 900;        // 同じボムへの連続ヒット防止
+  const BOMB_SPEECH_TEXT = '俺がしたっぱだ!';
+  const BOMB_SPEECH_MS = 1600;         // ヒット時にボムへ出す吹き出しの表示時間
   function updateBombs(dt){
     for(const b of activeBombs){
+      if(b.speechTimer > 0) b.speechTimer -= dt * 1000;
       if(b.cooldown > 0){
         b.cooldown -= dt * 1000;
         continue;
@@ -971,6 +974,7 @@ const BOMB_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAABiCAYA
         player.jumpChain = 0;
         player.chainTimer = 0;
         b.cooldown = BOMB_COOLDOWN_MS;
+        b.speechTimer = BOMB_SPEECH_MS;
       }
     }
   }
@@ -2070,13 +2074,46 @@ const BOMB_IMG_SRC = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGQAAABiCAYA
     const w = 70 * scale;
     const h = w * (bombImg.naturalHeight / bombImg.naturalWidth);
     ctx.drawImage(bombImg, sx - w / 2, groundY - h, w, h);
+    return h;
+  }
+
+  // ニンニクマンを吹っ飛ばした直後、しばらくボムの頭上に得意げな吹き出しを出す
+  const BOMB_SPEECH_FADE_MS = 400;
+  function drawBombSpeech(sx, topY, timer){
+    ctx.save();
+    ctx.globalAlpha = timer < BOMB_SPEECH_FADE_MS ? Math.max(0, timer / BOMB_SPEECH_FADE_MS) : 1;
+    ctx.font = 'bold 15px "Yu Gothic", Meiryo, sans-serif';
+    const padX = 10, padY = 7, lineH = 15;
+    const textW = ctx.measureText(BOMB_SPEECH_TEXT).width;
+    const bw = textW + padX * 2, bh = lineH + padY * 2;
+    const left = sx - bw / 2, top = topY - bh - 14;
+    ctx.fillStyle = '#fff';
+    ctx.strokeStyle = '#2a2a2a';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.roundRect(left, top, bw, bh, 8);
+    ctx.fill();
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(sx - 7, top + bh - 1);
+    ctx.lineTo(sx + 7, top + bh - 1);
+    ctx.lineTo(sx - 2, top + bh + 12);
+    ctx.closePath();
+    ctx.fillStyle = '#fff';
+    ctx.fill();
+    ctx.fillStyle = '#2a2a2a';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(BOMB_SPEECH_TEXT, sx, top + bh / 2);
+    ctx.restore();
   }
 
   function drawBombDecor(){
     for(const b of activeBombs){
       const sx = b.wx - camX;
       if(sx < -60 || sx > 1020) continue;
-      drawBombChar(sx, b.groundY0, b.scale);
+      const h = drawBombChar(sx, b.groundY0, b.scale);
+      if(b.speechTimer > 0) drawBombSpeech(sx, b.groundY0 - (h || 60), b.speechTimer);
     }
   }
 
